@@ -1,0 +1,1843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dicebound</title>
+<meta name="description" content="A playable crash course in Dungeons & Dragons 5th Edition.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Alegreya:ital,wght@0,400;0,600;1,400&family=Alegreya+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a game table at night. Green baize felt, brass trim, one story column,
+   a sticky HUD on top, choices below the log, dice rolled in a modal tray. */
+:root {
+  --felt: #0e1c17;
+  --felt-2: #13261e;
+  --panel: #19302a;
+  --panel-2: #213c33;
+  --line: #2f5246;
+  --ink: #ede6d3;
+  --ink-dim: #a7b5aa;
+  --brass: #dca94a;
+  --brass-deep: #8f6b26;
+  --ruby: #e0594b;
+  --arcane: #86b9ec;
+  --life: #6cc98a;
+  --f-display: "Grenze Gotisch", "Palatino Linotype", Georgia, serif;
+  --f-body: "Alegreya", Georgia, "Times New Roman", serif;
+  --f-ui: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --hud-h: 58px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--felt);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(220,169,74,.10), transparent 70%),
+    radial-gradient(ellipse 120% 80% at 50% 120%, rgba(0,0,0,.55), transparent 60%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 18px;
+  line-height: 1.6;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+code { font-family: var(--f-mono); font-size: .88em; background: var(--felt-2); padding: .05em .35em; border-radius: 4px; color: var(--brass); }
+
+/* ---------- HUD ---------- */
+.hud {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 8px 16px;
+  background: rgba(14,28,23,.94);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--f-ui);
+  font-size: 15px;
+}
+.brand { font-family: var(--f-display); font-size: 28px; color: var(--brass); line-height: 1; letter-spacing: .5px; }
+.hero { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.hero-id { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.hero-id b { font-size: 16px; }
+.hero-id span { color: var(--ink-dim); font-size: 13px; }
+.bars { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hp { display: flex; align-items: center; gap: 8px; }
+.bar { width: 110px; height: 10px; border-radius: 6px; background: var(--felt-2); border: 1px solid var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; background: var(--life); transition: width .4s ease, background .4s; }
+.bar.low i { background: var(--ruby); }
+.stat { font-variant-numeric: tabular-nums; color: var(--ink-dim); white-space: nowrap; }
+.stat b { color: var(--ink); }
+.stat.insp { color: var(--brass); }
+.hud-btns { display: flex; gap: 6px; margin-left: auto; }
+.hud-btns button {
+  background: transparent; border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 11px; font-size: 14px; color: var(--ink);
+}
+.hud-btns button:hover { border-color: var(--brass); }
+.hud-btns .count { color: var(--brass); font-variant-numeric: tabular-nums; }
+
+/* ---------- Stage ---------- */
+.stage { max-width: 780px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 80px; }
+.scene-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 18px; }
+.chapter-tag { font-family: var(--f-ui); text-transform: uppercase; letter-spacing: .16em; font-size: 13px; color: var(--brass); }
+.scene-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(36px, 7vw, 54px); line-height: 1.05; margin: 0; text-wrap: balance; }
+#log { display: flex; flex-direction: column; gap: 14px; }
+.entry { animation: rise .35s ease both; min-width: 0; }
+@keyframes rise { from { opacity: .001; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.entry p { margin: 0; }
+.entry.narr p { font-size: 19px; max-width: 65ch; }
+.entry.npc { border-left: 3px solid var(--brass-deep); padding-left: 14px; max-width: 65ch; }
+.entry.npc p { font-style: italic; }
+.who { display: block; font-family: var(--f-ui); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--brass); margin-bottom: 2px; }
+.entry.you { align-self: flex-end; max-width: 85%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px 14px 4px 14px; padding: 8px 14px; font-family: var(--f-ui); }
+.entry.you .who { color: var(--arcane); }
+.entry.dm {
+  display: grid; grid-template-columns: 46px 1fr; gap: 12px; align-items: start;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  font-family: var(--f-ui); font-size: 16.5px; line-height: 1.55;
+}
+.entry.dm > div { min-width: 0; }
+.entry.dm .who { color: var(--brass); }
+.entry.dm p + p { margin-top: 8px; }
+.entry.sys { font-family: var(--f-mono); font-size: 14px; color: var(--ink-dim); padding: 6px 10px; border-radius: 8px; background: rgba(0,0,0,.18); line-height: 1.7; }
+.entry.sys b { color: var(--ink); }
+.entry.sys.good { color: var(--life); }
+.entry.sys.bad { color: var(--ruby); }
+.entry.sys .good, .good-t { color: var(--life); }
+.entry.sys .bad, .bad-t { color: var(--ruby); }
+.entry.round { font-family: var(--f-ui); text-transform: uppercase; letter-spacing: .2em; font-size: 12px; color: var(--brass); display: flex; align-items: center; gap: 10px; }
+.entry.round::before, .entry.round::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.entry.quizq { font-family: var(--f-ui); font-weight: 700; color: var(--arcane); font-size: 17px; }
+.chip { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 5px; border-radius: 5px; background: var(--ink); color: var(--felt); font-weight: 600; font-size: 13px; }
+.chip.n20 { background: var(--brass); }
+.chip.n1 { background: var(--ruby); color: var(--ink); }
+.chip.dim { opacity: .45; }
+
+.twenty { width: 46px; height: 46px; display: block; }
+.twenty .tw-body { fill: var(--brass); }
+.twenty .tw-facet { fill: none; stroke: var(--brass-deep); stroke-width: 2; stroke-linejoin: round; }
+.twenty .tw-eye { fill: var(--felt); }
+.twenty .tw-mouth { fill: none; stroke: var(--felt); stroke-width: 3; stroke-linecap: round; }
+
+/* Loop diagram */
+.loop { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; counter-reset: step; }
+.loop div { background: var(--felt-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 14.5px; }
+.loop b { display: block; font-family: var(--f-display); font-size: 22px; color: var(--brass); line-height: 1.1; margin-bottom: 4px; }
+.ladder { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 4px; margin-top: 10px; text-align: center; font-size: 13px; }
+.ladder span { background: var(--felt-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 2px; }
+.ladder b { display: block; font-family: var(--f-mono); font-size: 16px; color: var(--brass); }
+.anatomy { font-family: var(--f-mono); font-size: 14px; background: var(--felt-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 8px; overflow-x: auto; white-space: nowrap; }
+
+/* ---------- Choices ---------- */
+#choices { margin-top: 22px; display: flex; flex-direction: column; gap: 10px; scroll-margin-bottom: 24px; }
+.prompt { font-family: var(--f-ui); font-size: 14px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-dim); }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.choice {
+  display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "key lbl tag" "key sub sub";
+  column-gap: 10px; row-gap: 2px; align-items: center; text-align: left;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px;
+  font-family: var(--f-ui); font-size: 16px; line-height: 1.3;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.choice:hover:not(:disabled) { border-color: var(--brass); background: var(--panel-2); }
+.choice:active:not(:disabled) { transform: translateY(1px); }
+.choice:disabled { opacity: .42; cursor: not-allowed; }
+.choice .key { grid-area: key; font-family: var(--f-mono); font-size: 12px; color: var(--ink-dim); border: 1px solid var(--line); border-radius: 5px; width: 22px; height: 22px; display: grid; place-items: center; align-self: start; }
+.choice .lbl { grid-area: lbl; font-weight: 500; min-width: 0; }
+.choice .tag { grid-area: tag; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--brass); white-space: nowrap; }
+.choice .sub { grid-area: sub; font-size: 14px; color: var(--ink-dim); }
+.choice.primary { background: var(--brass); color: var(--felt); border-color: var(--brass); }
+.choice.primary .key { color: var(--felt); border-color: rgba(14,28,23,.4); }
+.choice.primary .sub, .choice.primary .tag { color: var(--felt); }
+.choice.primary:hover:not(:disabled) { background: #e8b95d; }
+.choice.end { border-style: dashed; }
+.choice.big .lbl { font-family: var(--f-display); font-size: 24px; font-weight: 500; }
+
+/* ---------- Widgets ---------- */
+.widget { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-family: var(--f-ui); }
+.widget .lbl { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-dim); margin-bottom: 6px; }
+.name-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.name-row input {
+  flex: 1; min-width: 0; background: var(--felt); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; font: 500 18px var(--f-ui); color: var(--ink);
+}
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; font-family: var(--f-ui); font-size: 15px; }
+.btn:hover:not(:disabled) { border-color: var(--brass); }
+.hint { margin: 10px 0 0; color: var(--ink-dim); font-size: 14.5px; }
+.abil-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+.abil {
+  display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: "name score mod" "desc desc desc" "flag flag flag";
+  column-gap: 10px; align-items: baseline; text-align: left;
+  background: var(--felt-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+.abil:hover:not(:disabled) { border-color: var(--brass); }
+.abil.sel { border-color: var(--arcane); box-shadow: 0 0 0 2px rgba(134,185,236,.3); }
+.ab-name { grid-area: name; font-weight: 700; }
+.ab-score { grid-area: score; font-family: var(--f-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+.ab-mod { grid-area: mod; font-family: var(--f-mono); color: var(--brass); font-variant-numeric: tabular-nums; min-width: 2.2em; text-align: right; }
+.ab-desc { grid-area: desc; font-size: 13.5px; color: var(--ink-dim); line-height: 1.35; margin-top: 2px; }
+.ab-flag { grid-area: flag; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--brass); margin-top: 4px; }
+.dice-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.die-btn { background: var(--felt-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-family: var(--f-ui); }
+.die-btn:hover { border-color: var(--brass); }
+.die-btn.done { border-color: var(--brass-deep); }
+.die-btn .dname { font-family: var(--f-mono); font-size: 14px; color: var(--brass); }
+.die-info { margin-top: 10px; min-height: 3.2em; font-size: 15.5px; }
+.sheet-card { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.sheet-card div { background: var(--felt-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.sheet-card small { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-dim); }
+.sheet-card b { font-family: var(--f-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+.sheet-card span { display: block; font-size: 13px; color: var(--ink-dim); line-height: 1.3; }
+
+/* ---------- Dice SVG ---------- */
+.die { width: 64px; height: 64px; display: block; }
+.die .d-body { fill: var(--ink); stroke: var(--brass-deep); stroke-width: 3; stroke-linejoin: round; }
+.die .d-facet { fill: none; stroke: rgba(143,107,38,.55); stroke-width: 2; stroke-linejoin: round; }
+.die text { font-family: var(--f-mono); font-weight: 600; fill: var(--felt); text-anchor: middle; dominant-baseline: central; }
+.die.red .d-body { fill: var(--ruby); }
+.die.red text { fill: var(--ink); }
+.die.gold .d-body { fill: var(--brass); }
+.die.dim { opacity: .35; }
+.die.rolling { animation: tumble .12s linear infinite; }
+@keyframes tumble { 0% { transform: rotate(-14deg) scale(.96); } 50% { transform: rotate(12deg) scale(1.04); } 100% { transform: rotate(-14deg) scale(.96); } }
+.die.land { animation: land .35s cubic-bezier(.3,1.6,.5,1); }
+@keyframes land { from { transform: scale(1.35); } to { transform: scale(1); } }
+
+/* ---------- Tray ---------- */
+.tray { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(5,12,10,.72); backdrop-filter: blur(3px); }
+.tray-card {
+  width: 100%; max-width: 520px; max-height: 100%; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--brass-deep); border-radius: 16px; padding: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  font-family: var(--f-ui); text-align: center;
+  animation: rise .25s ease both;
+}
+.tray-kind { text-transform: uppercase; letter-spacing: .16em; font-size: 12px; color: var(--brass); }
+.tray-card h2 { font-family: var(--f-display); font-weight: 500; font-size: 32px; line-height: 1.1; margin: 4px 0 6px; text-wrap: balance; }
+.tray-sub { margin: 0 0 10px; color: var(--ink-dim); font-size: 15px; line-height: 1.45; }
+.tray-formula { font-family: var(--f-mono); font-size: 15px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; }
+.tray-formula .term small { color: var(--ink-dim); font-size: 12px; }
+.tray-formula .vs { color: var(--brass); }
+.tray-dice { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 16px 0 8px; min-height: 100px; align-items: center; }
+.tray-dice .die { width: 96px; height: 96px; }
+.tray-dice.many .die { width: 64px; height: 64px; }
+.tray-math { font-family: var(--f-mono); font-size: 17px; min-height: 1.6em; font-variant-numeric: tabular-nums; }
+.tray-verdict { font-family: var(--f-display); font-size: 40px; line-height: 1.1; min-height: 1.1em; margin: 4px 0; }
+.tray-verdict.good { color: var(--life); }
+.tray-verdict.bad { color: var(--ruby); }
+.tray-verdict.crit { color: var(--brass); text-shadow: 0 0 18px rgba(220,169,74,.6); }
+.tray-note { font-size: 14.5px; color: var(--ink-dim); min-height: 0; margin: 0 0 8px; }
+.tray-note:empty { display: none; }
+.tray-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.tray-actions button { border-radius: 10px; padding: 12px; font-size: 17px; font-weight: 700; background: var(--panel-2); border: 1px solid var(--line); }
+.tray-actions button.primary { background: var(--brass); color: var(--felt); border-color: var(--brass); }
+.tray-actions button.alt { color: var(--brass); border-color: var(--brass-deep); font-weight: 500; font-size: 15px; }
+
+/* ---------- Combat board ---------- */
+#board:empty { display: none; }
+#board {
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--hud-h)); z-index: 10;
+  background: var(--felt-2); border: 1px solid var(--line); border-radius: 12px; isolation: isolate;
+  padding: 10px 12px; margin-bottom: 16px; font-family: var(--f-ui); font-size: 14px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+}
+.order { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.ord { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 3px 9px 3px 4px; border-radius: 20px; border: 1px solid var(--line); background: var(--felt-2); white-space: nowrap; font-size: 13px; }
+.ord .ini { font-family: var(--f-mono); font-size: 11px; background: var(--panel-2); border-radius: 12px; padding: 1px 6px; }
+.ord.active { border-color: var(--brass); background: var(--panel-2); }
+.ord.down { opacity: .4; text-decoration: line-through; }
+.track { position: relative; height: 64px; margin: 10px 4px 2px; border-bottom: 1px dashed var(--line); }
+.track .ft { position: absolute; bottom: -18px; font-family: var(--f-mono); font-size: 10.5px; color: var(--ink-dim); transform: translateX(-50%); }
+.tok { position: absolute; bottom: 6px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; transition: left .5s ease; }
+.tok i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 13px; border: 2px solid var(--ink); }
+.tok.you i { background: var(--arcane); color: var(--felt); }
+.tok.pip i { background: var(--life); color: var(--felt); }
+.tok.foe i { background: var(--ruby); color: var(--ink); }
+.tok.boss i { width: 38px; height: 38px; }
+.tok.down i { background: var(--panel-2); color: var(--ink-dim); border-color: var(--line); }
+.tok span { font-size: 10.5px; white-space: nowrap; color: var(--ink-dim); }
+.tok.lane2 { bottom: 34px; }
+.foes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin-top: 24px; }
+.foecard { background: var(--felt-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; display: flex; justify-content: space-between; gap: 8px; }
+.foecard b { font-weight: 700; }
+.foecard .st { font-size: 12.5px; }
+.st.unhurt { color: var(--ink-dim); } .st.bloodied { color: var(--brass); } .st.dying { color: var(--ruby); } .st.gone { color: var(--ink-dim); }
+.econ { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pip-e { font-size: 12px; padding: 2px 9px; border-radius: 12px; border: 1px solid var(--brass-deep); color: var(--brass); }
+.pip-e.used { opacity: .35; text-decoration: line-through; }
+.pip-hp { font-size: 12.5px; color: var(--ink-dim); margin-left: auto; align-self: center; }
+
+/* ---------- Drawers ---------- */
+.drawer { position: fixed; inset: 0; z-index: 40; display: flex; justify-content: flex-end; background: rgba(5,12,10,.6); }
+.drawer-panel {
+  width: 100%; max-width: 460px; height: 100%; overflow-y: auto; background: var(--felt-2); border-left: 1px solid var(--line);
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  font-family: var(--f-ui); font-size: 15.5px; animation: slide .25s ease both;
+}
+@keyframes slide { from { transform: translateX(30px); opacity: .001; } to { transform: none; opacity: 1; } }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.drawer-head h2 { font-family: var(--f-display); font-weight: 500; font-size: 34px; margin: 0; color: var(--brass); }
+.x { background: transparent; border: 1px solid var(--line); border-radius: 8px; width: 36px; height: 36px; font-size: 18px; }
+.codex-entry { border-top: 1px solid var(--line); padding: 10px 0; }
+.codex-entry h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); }
+.codex-entry p { margin: 0; color: var(--ink-dim); line-height: 1.5; }
+.codex-entry.locked h3 { color: var(--ink-dim); letter-spacing: .2em; }
+.codex-entry.fresh h3::after { content: " new"; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--brass); }
+.sh-sec { margin-top: 16px; }
+.sh-sec h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .14em; color: var(--brass); margin: 0 0 6px; }
+.sh-abils { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
+.sh-abils div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px; text-align: center; }
+.sh-abils small { display: block; font-size: 11px; letter-spacing: .1em; color: var(--ink-dim); }
+.sh-abils b { font-family: var(--f-mono); font-size: 22px; color: var(--brass); }
+.sh-abils span { display: block; font-family: var(--f-mono); font-size: 12.5px; color: var(--ink-dim); }
+.sh-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; }
+.sh-list li { display: flex; justify-content: space-between; gap: 6px; font-size: 14px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.sh-list li.p { color: var(--ink); }
+.sh-list li.p::before { content: "●"; color: var(--brass); font-size: 9px; margin-right: 4px; align-self: center; }
+.sh-list li span:first-child { flex: 1; }
+.sh-feat { margin: 0; padding-left: 18px; color: var(--ink-dim); }
+.sh-feat li { margin-bottom: 4px; }
+.sh-feat b { color: var(--ink); }
+
+/* ---------- Toasts ---------- */
+#toasts { position: fixed; z-index: 60; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
+.toast { background: var(--panel-2); border: 1px solid var(--brass-deep); border-radius: 10px; padding: 8px 14px; font-family: var(--f-ui); font-size: 14.5px; box-shadow: 0 8px 20px rgba(0,0,0,.4); animation: rise .3s ease both; max-width: 300px; }
+.toast small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--brass); }
+.toast.out { opacity: 0; transition: opacity .4s; }
+
+/* ---------- Title ---------- */
+.title-screen { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; padding-top: 4vh; }
+.title-screen .twenty { width: 110px; height: 110px; animation: bob 3.2s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(4deg); } }
+.big-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(64px, 16vw, 128px); line-height: .9; margin: 0; color: var(--brass); letter-spacing: 1px; }
+.tagline { font-size: 21px; max-width: 34ch; margin: 0; }
+.feature-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; width: 100%; font-family: var(--f-ui); font-size: 14.5px; color: var(--ink-dim); }
+.feature-list div { border-top: 1px solid var(--line); padding-top: 8px; }
+.feature-list b { display: block; color: var(--ink); font-size: 15px; }
+.badges { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.badge { background: var(--felt-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-family: var(--f-ui); font-size: 14px; }
+.badge b { display: block; color: var(--brass); }
+.badge.locked { opacity: .4; }
+.badge.locked b { color: var(--ink-dim); }
+.cheat { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.cheat div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-family: var(--f-ui); font-size: 15px; }
+.cheat h4 { margin: 0 0 6px; font-family: var(--f-display); font-weight: 500; font-size: 24px; color: var(--brass); line-height: 1.1; }
+.cheat ul { margin: 0; padding-left: 18px; color: var(--ink-dim); }
+.cheat li { margin-bottom: 3px; }
+.cheat li b { color: var(--ink); }
+
+@media (max-width: 560px) {
+  body { font-size: 17px; }
+  .bar { width: 80px; }
+  .brand { font-size: 24px; }
+  .hud { gap: 6px 10px; padding: 6px 12px; }
+  .hud.playing .brand { display: none; }
+  .hud.playing .hud-btns { margin-left: 0; }
+  .hero { gap: 4px 10px; }
+  .hero-id { flex-direction: row; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .hud-btns button { padding: 4px 8px; font-size: 13px; }
+  .bars { gap: 4px 10px; }
+  .loop { grid-template-columns: 1fr; }
+  .ladder { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .tray-dice .die { width: 80px; height: 80px; }
+  .tray-verdict { font-size: 34px; }
+  .sh-list { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="hud" id="hud">
+  <div class="brand">Dicebound</div>
+  <div class="hero" id="hudHero" hidden>
+    <div class="hero-id"><b id="hudName"></b><span id="hudClass"></span></div>
+    <div class="bars">
+      <div class="hp" title="Hit points"><div class="bar" id="hpBar"><i id="hpFill"></i></div><span class="stat"><b id="hpText"></b> HP</span></div>
+      <span class="stat" title="Armor Class">AC <b id="acText"></b></span>
+      <span class="stat" id="slotText" title="1st-level spell slots"></span>
+      <span class="stat" title="Experience points">XP <b id="xpText"></b></span>
+      <span class="stat insp" id="inspText"></span>
+    </div>
+  </div>
+  <nav class="hud-btns">
+    <button id="btnSheet" hidden>Sheet</button>
+    <button id="btnCodex">Rulebook <span class="count" id="codexCount"></span></button>
+    <button id="btnSound" aria-pressed="true" title="Toggle sound">Sound on</button>
+  </nav>
+</header>
+
+<main class="stage">
+  <div class="scene-head" id="sceneHead">
+    <span class="chapter-tag" id="chapterTag"></span>
+    <h1 class="scene-title" id="sceneTitle"></h1>
+  </div>
+  <div id="board"></div>
+  <div id="log"></div>
+  <div id="choices"></div>
+</main>
+
+<div id="tray" class="tray" hidden role="dialog" aria-modal="true" aria-labelledby="trayTitle">
+  <div class="tray-card">
+    <div class="tray-kind" id="trayKind"></div>
+    <h2 id="trayTitle"></h2>
+    <p class="tray-sub" id="traySub"></p>
+    <div class="tray-formula" id="trayFormula"></div>
+    <div class="tray-dice" id="trayDice"></div>
+    <div class="tray-math" id="trayMath"></div>
+    <div class="tray-verdict" id="trayVerdict"></div>
+    <p class="tray-note" id="trayNote"></p>
+    <div class="tray-actions" id="trayActions"></div>
+  </div>
+</div>
+
+<div id="sheetDrawer" class="drawer" hidden><div class="drawer-panel" role="dialog" aria-labelledby="sheetH"><div class="drawer-head"><h2 id="sheetH">Character Sheet</h2><button class="x" data-close aria-label="Close">✕</button></div><div id="sheetBody"></div></div></div>
+<div id="codexDrawer" class="drawer" hidden><div class="drawer-panel" role="dialog" aria-labelledby="codexH"><div class="drawer-head"><h2 id="codexH">Rulebook</h2><button class="x" data-close aria-label="Close">✕</button></div><p style="margin:0 0 8px;color:var(--ink-dim)">Every rule you learn on your adventure is written down here. Locked pages unlock as you play.</p><div id="codexBody"></div></div></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =========================================================
+   Data
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rnd = n => 1 + Math.floor(Math.random() * n);
+const mod = s => Math.floor((s - 10) / 2);
+const fmt = n => (n >= 0 ? "+" : "−") + Math.abs(n);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const PB = 2;
+
+const ABILS = ["str", "dex", "con", "int", "wis", "cha"];
+const ABIL = { str: "Strength", dex: "Dexterity", con: "Constitution", int: "Intelligence", wis: "Wisdom", cha: "Charisma" };
+const ABBR = { str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA" };
+const ABIL_DESC = {
+  str: "Lifting, climbing, shoving, swinging heavy weapons.",
+  dex: "Agility and reflexes: sneaking, dodging, aiming.",
+  con: "Toughness and stamina. Adds to your hit points.",
+  int: "Memory and reasoning. Wizards cast spells with it.",
+  wis: "Awareness and intuition. Clerics cast spells with it.",
+  cha: "Force of personality: persuading, lying, performing."
+};
+const SKILLS = { acrobatics: "dex", animalHandling: "wis", arcana: "int", athletics: "str", deception: "cha", history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis", nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int", sleightOfHand: "dex", stealth: "dex", survival: "wis" };
+const SKILL_NAME = { acrobatics: "Acrobatics", animalHandling: "Animal Handling", arcana: "Arcana", athletics: "Athletics", deception: "Deception", history: "History", insight: "Insight", intimidation: "Intimidation", investigation: "Investigation", medicine: "Medicine", nature: "Nature", perception: "Perception", performance: "Performance", persuasion: "Persuasion", religion: "Religion", sleightOfHand: "Sleight of Hand", stealth: "Stealth", survival: "Survival" };
+
+const SPECIES = {
+  human: { name: "Human", blurb: "Adaptable and ambitious. Good at a bit of everything.", traits: ["<b>Skillful:</b> one extra skill proficiency.", "<b>Resourceful:</b> you start with Heroic Inspiration (reroll any one d20)."] },
+  elf: { name: "Elf", blurb: "Graceful, long-lived, and sharp-eyed.", traits: ["<b>Darkvision:</b> you see in darkness as if it were dim light.", "<b>Keen Senses:</b> proficiency in Perception.", "<b>Fey Ancestry:</b> advantage on saves against being charmed."] },
+  dwarf: { name: "Dwarf", blurb: "Stout, stubborn, and very hard to knock down.", traits: ["<b>Darkvision:</b> you see in darkness as if it were dim light.", "<b>Dwarven Toughness:</b> +1 maximum HP per level.", "<b>Dwarven Resilience:</b> resistance to poison damage."] },
+  halfling: { name: "Halfling", blurb: "Small, quick, and absurdly lucky.", traits: ["<b>Lucky:</b> when you roll a 1 on a d20, reroll it.", "<b>Brave:</b> advantage on saves against being frightened.", "<b>Nimble:</b> you can move through the space of bigger creatures."] }
+};
+
+const BACKGROUNDS = {
+  soldier: { name: "Soldier", blurb: "You marched with an army before this.", skills: ["athletics", "intimidation"] },
+  criminal: { name: "Criminal", blurb: "Locks, pockets, and a quick exit.", skills: ["sleightOfHand", "stealth"] },
+  sage: { name: "Sage", blurb: "Years in libraries, arguing about footnotes.", skills: ["arcana", "history"] },
+  acolyte: { name: "Acolyte", blurb: "You served in a temple.", skills: ["insight", "religion"] },
+  noble: { name: "Noble", blurb: "Raised among banquets and politics.", skills: ["history", "persuasion"] },
+  guide: { name: "Guide", blurb: "You led travelers through the wilds.", skills: ["stealth", "survival"] }
+};
+
+const CLASSES = {
+  fighter: {
+    name: "Fighter", role: "Armored warrior", blurb: "A master of weapons and armor. Tough, simple, and reliable. A great first class.",
+    hd: 10, primary: "str", saves: ["str", "con"], skills: ["athletics", "perception"],
+    rec: { str: 15, con: 14, dex: 13, wis: 12, cha: 10, int: 8 },
+    ac: () => 18, acNote: "Chain mail (16) + shield (+2)",
+    weapon: { name: "Longsword", dice: "1d8", stat: "str", type: "slashing" },
+    features: ["<b>Second Wind</b> (bonus action): regain 1d10 + your level in HP. 2 uses; one returns on a short rest.", "<b>Fighting Style:</b> a combat specialty, like Defense or Dueling.", "<b>Weapon Mastery:</b> special tricks with your favorite weapons (2024 rules)."]
+  },
+  rogue: {
+    name: "Rogue", role: "Sneaky striker", blurb: "Skilled, stealthy, and deadly when an enemy is distracted.",
+    hd: 8, primary: "dex", saves: ["dex", "int"], skills: ["stealth", "acrobatics", "perception", "deception"],
+    rec: { dex: 15, con: 14, wis: 13, cha: 12, int: 10, str: 8 },
+    ac: s => 11 + mod(s.dex), acNote: "Leather armor (11 + DEX)",
+    weapon: { name: "Shortsword", dice: "1d6", stat: "dex", type: "piercing", light: true },
+    offhand: { name: "Dagger (off-hand)", dice: "1d4", stat: "dex", type: "piercing" },
+    features: ["<b>Sneak Attack:</b> once per turn, +1d6 damage if you have advantage on the attack or an ally is next to your target.", "<b>Expertise:</b> double your proficiency bonus in two skills.", "<b>Thieves' Cant:</b> a secret language of signs and slang."]
+  },
+  wizard: {
+    name: "Wizard", role: "Spellcaster", blurb: "Fragile scholar with powerful spells. Hits hard from a distance.",
+    hd: 6, primary: "int", saves: ["int", "wis"], skills: ["arcana", "investigation"],
+    rec: { int: 15, dex: 14, con: 13, wis: 12, cha: 10, str: 8 },
+    ac: s => 10 + mod(s.dex), acNote: "No armor (10 + DEX). The Shield spell adds +5.",
+    weapon: { name: "Quarterstaff", dice: "1d6", stat: "str", type: "bludgeoning" },
+    cantrip: { id: "firebolt", name: "Fire Bolt", desc: "Ranged spell attack, 1d10 fire damage. Cantrip: free to cast." },
+    spell: { id: "missile", name: "Magic Missile", desc: "Three glowing darts that never miss: 3 × (1d4 + 1) force damage." },
+    slots: 2,
+    features: ["<b>Spellcasting:</b> you prepare spells from your spellbook.", "<b>Fire Bolt</b> (cantrip): ranged spell attack, 1d10 fire.", "<b>Magic Missile</b> (1st level): three darts, 1d4 + 1 each, always hit.", "<b>Shield</b> (1st level, reaction): +5 AC until your next turn, cast when you're hit.", "<b>Arcane Recovery:</b> regain one spell slot on a short rest."]
+  },
+  cleric: {
+    name: "Cleric", role: "Divine healer", blurb: "Armored servant of a god. Heals friends and smites foes.",
+    hd: 8, primary: "wis", saves: ["wis", "cha"], skills: ["insight", "medicine"],
+    rec: { wis: 15, con: 14, str: 13, dex: 12, cha: 10, int: 8 },
+    ac: s => 14 + Math.min(2, mod(s.dex)) + 2, acNote: "Scale mail (14 + DEX, max 2) + shield (+2)",
+    weapon: { name: "Mace", dice: "1d6", stat: "str", type: "bludgeoning" },
+    cantrip: { id: "flame", name: "Sacred Flame", desc: "Target makes a DEX save against your spell save DC or takes 1d8 radiant." },
+    spell: { id: "bolt", name: "Guiding Bolt", desc: "Ranged spell attack, 4d6 radiant. The next attack against the target has advantage." },
+    slots: 2,
+    features: ["<b>Spellcasting:</b> you prepare spells granted by your god.", "<b>Sacred Flame</b> (cantrip): target makes a DEX save or takes 1d8 radiant.", "<b>Guiding Bolt</b> (1st level): 4d6 radiant, and the next attack on the target has advantage.", "<b>Healing Word</b> (1st level, bonus action): heal 2d4 + WIS at range."]
+  }
+};
+
+const CODEX = [
+  ["roles", "DM & Players", "The <b>Dungeon Master</b> describes the world, voices every character the party meets, and applies the rules. Each <b>player</b> controls one character and decides what that character says and does. The DM is not your opponent; they want the table to have a great story."],
+  ["core", "The Core Loop", "1. The DM describes a situation. 2. Players say what their characters do. 3. If the result is uncertain, the DM asks for a roll, then narrates what happens. Almost everything in D&D is this loop."],
+  ["dice", "Dice & Notation", "A standard set has a d4, d6, d8, d10, d12, d20 and a percentile die for d100. <b>XdY + Z</b> means roll X dice with Y sides, add them, then add Z. The d20 decides success or failure; the others mostly measure damage and healing."],
+  ["abilities", "The Six Abilities", "<b>Strength</b> (power), <b>Dexterity</b> (agility), <b>Constitution</b> (toughness), <b>Intelligence</b> (reasoning), <b>Wisdom</b> (awareness), <b>Charisma</b> (personality). Each has a score, usually 8 to 20 for heroes."],
+  ["modifier", "Ability Modifiers", "You rarely use a score directly. You use its <b>modifier</b>: subtract 10, divide by 2, round down. 8–9 → −1, 10–11 → +0, 12–13 → +1, 14–15 → +2, 16–17 → +3, 18–19 → +4, 20 → +5."],
+  ["standard", "Making Ability Scores", "The <b>standard array</b> assigns 15, 14, 13, 12, 10 and 8. Some tables roll 4d6 and drop the lowest die, or use point buy. You then add +2 to one score and +1 to another (2024 rules: from your background; 2014 rules: from your species)."],
+  ["species", "Species, Class & Background", "Your <b>species</b> (called race in older books) gives traits like darkvision. Your <b>background</b> is your life before adventuring and gives skill proficiencies. Your <b>class</b> is your adventuring job and shapes how you play the most."],
+  ["prof", "Proficiency Bonus", "When you're trained in something (a skill, a weapon, a saving throw, your spells), add your <b>proficiency bonus</b>. It is +2 at levels 1–4 and grows to +6 by level 17."],
+  ["ac", "Armor Class (AC)", "How hard you are to hit. An attacker rolls d20 + their bonus; if the total equals or beats your AC, they hit. Armor, shields, and Dexterity raise it."],
+  ["hp", "Hit Points & Hit Dice", "Hit points measure how much punishment you can take. At level 1 you get your class's <b>Hit Die</b> maximum plus your Constitution modifier. You also have Hit Dice to spend on healing during a short rest."],
+  ["check", "Ability Checks & DC", "To attempt something uncertain, roll <b>d20 + ability modifier</b>, plus your proficiency bonus if you're proficient in the skill. Meet or beat the <b>Difficulty Class</b> to succeed. DC 5 very easy, 10 easy, 15 medium, 20 hard, 25 very hard, 30 nearly impossible."],
+  ["skills", "Skills", "Skills are specialties within an ability. STR: Athletics. DEX: Acrobatics, Sleight of Hand, Stealth. INT: Arcana, History, Investigation, Nature, Religion. WIS: Animal Handling, Insight, Medicine, Perception, Survival. CHA: Deception, Intimidation, Performance, Persuasion."],
+  ["failforward", "Failing Forward", "A failed roll rarely ends the story. Good DMs turn failure into a complication: lost time, noise, cost, or a new problem. Don't be afraid to fail. It's often where the fun is."],
+  ["contest", "Contests", "When two creatures directly oppose each other (arm wrestling, sneaking past a guard), both roll and the higher total wins. On a tie, the situation stays as it was."],
+  ["adv", "Advantage & Disadvantage", "<b>Advantage:</b> roll two d20s and use the higher. <b>Disadvantage:</b> roll two and use the lower. Several sources don't stack, and if you have both they cancel out."],
+  ["help", "Working Together", "The <b>Help</b> action lets an ally give you advantage on a check or an attack. In a <b>group check</b>, everyone rolls, and the group succeeds if at least half of them succeed."],
+  ["vision", "Light & Darkvision", "In dim light, Perception checks that rely on sight have disadvantage. In darkness you're effectively blind. <b>Darkvision</b> lets you see in darkness as if it were dim light (without color)."],
+  ["passive", "Passive Perception", "10 + your Perception bonus. The DM can compare it against hidden things so you notice them without rolling, and without tipping you off that something was there."],
+  ["save", "Saving Throws", "A save resists danger: a trap, a spell, poison. Roll <b>d20 + ability modifier</b>, plus proficiency if your class is proficient in that save, against a DC. Checks are things you try to do; saves are things that happen to you."],
+  ["init", "Initiative & Rounds", "When combat starts, everyone rolls <b>d20 + Dexterity modifier</b>. Turns go from highest to lowest. One full cycle is a <b>round</b>, about 6 seconds of game time."],
+  ["turn", "Your Turn", "On your turn you can <b>move</b> up to your speed (usually 30 ft), take one <b>action</b>, and take one <b>bonus action</b> if a feature gives you one. You can split your movement around your action. You also get one <b>reaction</b> per round, which you can use on anyone's turn."],
+  ["actions", "Actions You Can Take", "Attack, Cast a Spell, Dash (extra movement), Disengage (leave without provoking attacks), Dodge (attacks against you have disadvantage), Help, Hide, Ready (prepare an action for a trigger), Search, Use an Object, and anything else you can describe."],
+  ["attack", "Attack Rolls", "Roll <b>d20 + ability modifier + proficiency bonus</b> against the target's AC. Melee weapons use Strength (finesse weapons can use Dexterity), ranged weapons use Dexterity, spells use your spellcasting ability. A natural 20 always hits, a natural 1 always misses. A ranged attack with an enemy next to you has disadvantage."],
+  ["damage", "Damage & Critical Hits", "On a hit, roll the weapon or spell's damage dice and add the same ability modifier you used to attack. A <b>critical hit</b> (natural 20) doubles the dice, not the modifier."],
+  ["monsterhp", "Monster Hit Points", "Players usually don't see a monster's exact HP. The DM describes how hurt it looks. <b>Bloodied</b> means it's down to half its hit points or less."],
+  ["reaction", "Reactions & Opportunity Attacks", "A reaction is an instant response to a trigger, once per round. The most common is the <b>opportunity attack</b>: a free melee attack when an enemy leaves your reach. Some spells, like <i>Shield</i>, are reactions too."],
+  ["spells", "Spells, Cantrips & Slots", "<b>Cantrips</b> can be cast as often as you like. Bigger spells use a <b>spell slot</b>, like ammunition that refills on a long rest. A level 1 wizard or cleric has two 1st-level slots."],
+  ["spellsave", "Spell Attacks & Save DC", "Some spells need a <b>spell attack</b>: d20 + spellcasting modifier + proficiency vs AC. Others force a <b>saving throw</b> against your <b>spell save DC</b>: 8 + proficiency + spellcasting modifier."],
+  ["zero", "0 HP & Death Saves", "At 0 HP you fall unconscious. On each of your turns, roll a <b>death saving throw</b>: a d20, 10 or higher is a success. Three successes and you stabilize; three failures and you die. A natural 20 brings you back with 1 HP; a natural 1 counts as two failures. Any healing wakes you up."],
+  ["inspiration", "Inspiration", "<b>Heroic Inspiration</b> lets you reroll one d20. DMs often award it for great roleplay. <b>Bardic Inspiration</b> is a die a bard gives you to add to a roll."],
+  ["thp", "Temporary Hit Points", "A buffer that soaks up damage before your real HP. They don't stack and can't be healed back."],
+  ["rest", "Short & Long Rests", "<b>Short rest</b> (1 hour): spend Hit Dice to heal (roll the die + your Constitution modifier); some features recharge. <b>Long rest</b> (8 hours): regain all HP, spell slots, and most features."],
+  ["creative", "You Can Try Anything", "Your character sheet lists what you're good at, not everything you're allowed to do. Describe a clever plan and the DM will pick a check for it. Often the best solution isn't a fight."],
+  ["xp", "Experience & Levels", "Defeating, outsmarting, or negotiating past monsters earns <b>XP</b>. 300 XP reaches level 2, 900 reaches level 3. Many groups skip XP and level up at story milestones instead."],
+  ["conditions", "Conditions", "Status effects with fixed rules: Blinded, Charmed, Deafened, Frightened, Grappled, Incapacitated, Invisible, Paralyzed, Petrified, Poisoned, Prone, Restrained, Stunned, Unconscious, and Exhaustion. Look them up the first time they come up. Nobody memorizes them all."],
+  ["etiquette", "Table Etiquette", "Share the spotlight, pay attention on other people's turns, know your own sheet, and ask questions freely. A <b>Session Zero</b> sets expectations before play: tone, content limits, and how the group likes to play."]
+];
+
+const BADGES = {
+  firstroll: ["First Roll", "Rolled your first d20."],
+  nat20: ["Natural 20", "Rolled a 20 on the d20."],
+  nat1: ["Natural 1", "Rolled a 1. It happens to everyone."],
+  silver: ["Silver Tongue", "Won a social check at the Wobbly Wyvern."],
+  arm: ["Arm of Steel", "Beat Old Brunhild at arm wrestling."],
+  trap: ["Trap Spotter", "Found the tripwire before it found you."],
+  goblin: ["Goblin Slayer", "Won your first combat."],
+  brink: ["Back From the Brink", "Survived at 0 hit points."],
+  riddle: ["Riddle Master", "Solved the goblin door's riddle."],
+  diplomat: ["Diplomat", "Talked the boss into surrendering."],
+  creative: ["Creative Genius", "Pulled off a creative action in combat."],
+  scholar: ["Rules Scholar", "Answered every pop quiz correctly."],
+  hero: ["Hero of Brindlewood", "Brought home the Great Wheel."]
+};
+
+const NAMES = ["Rowan Ashby", "Thalia Brightwater", "Bram Copperkettle", "Isolde Vane", "Garrick Stonefoot", "Wren Hollowmere", "Sable Thornquist", "Odo Puddlefoot", "Lirien Moonshadow", "Tamsin Reed"];
+
+/* =========================================================
+   State & persistence
+   ========================================================= */
+const SAVE_KEY = "dicebound-save-v1";
+function freshState() {
+  return { chapter: 0, name: "", species: null, cls: null, bg: null, scores: null, skills: [], hp: 0, maxHp: 0, thp: 0, ac: 10,
+    xp: 0, level: 1, gold: 0, slots: 0, maxSlots: 0, hitDice: 1, secondWind: 0, inspiration: false, bardic: false, potions: 0,
+    pip: { hp: 12, maxHp: 12, ac: 14, heals: 2 }, lore: [], fresh: [], badges: [], quiz: { right: 0, total: 0 }, flags: {} };
+}
+let S = freshState();
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function loadSave() { try { const v = localStorage.getItem(SAVE_KEY); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+
+const C = () => CLASSES[S.cls];
+const abilMod = a => mod(S.scores[a]);
+const isProf = sk => S.skills.includes(sk);
+const skillBonus = sk => abilMod(SKILLS[sk]) + (isProf(sk) ? PB : 0);
+const saveBonus = a => abilMod(a) + (C().saves.includes(a) ? PB : 0);
+const spellMod = () => abilMod(C().primary);
+const spellDC = () => 8 + PB + spellMod();
+const passivePerception = () => 10 + skillBonus("perception");
+function first(k) { if (S.flags[k]) return false; S.flags[k] = 1; return true; }
+
+/* =========================================================
+   Audio (tiny WebAudio synth, starts after first click)
+   ========================================================= */
+let actx = null, soundOn = true;
+function audio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } } return actx; }
+function tone(f, dur = .12, type = "sine", vol = .07, when = 0) {
+  if (!soundOn) return; const c = audio(); if (!c) return;
+  const t = c.currentTime + when, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .03);
+}
+function sfx(k) {
+  if (k === "click") tone(640, .05, "triangle", .035);
+  else if (k === "roll") for (let i = 0; i < 7; i++) tone(260 + Math.random() * 900, .035, "square", .025, i * .075);
+  else if (k === "good") [523, 659, 784].forEach((f, i) => tone(f, .16, "triangle", .06, i * .09));
+  else if (k === "bad") { tone(220, .2, "sawtooth", .035); tone(160, .3, "sawtooth", .035, .14); }
+  else if (k === "crit") [523, 659, 784, 1047].forEach((f, i) => tone(f, .22, "triangle", .07, i * .08));
+  else if (k === "hit") tone(120, .14, "square", .05);
+  else if (k === "level") [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, .26, "triangle", .06, i * .11));
+  else if (k === "chime") tone(1046, .25, "sine", .05);
+}
+
+/* =========================================================
+   Graphics
+   ========================================================= */
+const TWENTY = `<svg class="twenty" viewBox="0 0 100 100" aria-hidden="true"><polygon class="tw-body" points="50,4 90,27 90,73 50,96 10,73 10,27"/><g class="tw-facet"><polygon points="50,22 78,70 22,70"/><path d="M50 22 50 4M50 22 10 27M50 22 90 27M22 70 10 27M22 70 10 73M22 70 50 96M78 70 90 27M78 70 90 73M78 70 50 96"/></g><circle class="tw-eye" cx="42" cy="50" r="4.5"/><circle class="tw-eye" cx="58" cy="50" r="4.5"/><path class="tw-mouth" d="M43 60 Q50 66 57 60"/></svg>`;
+function dieSVG(s, v, cls = "") {
+  const shapes = {
+    4: `<polygon class="d-body" points="50,6 95,90 5,90"/>`,
+    6: `<rect class="d-body" x="10" y="10" width="80" height="80" rx="13"/>`,
+    8: `<polygon class="d-body" points="50,4 95,50 50,96 5,50"/><path class="d-facet" d="M5 50 22 50M78 50 95 50"/>`,
+    10: `<polygon class="d-body" points="50,4 94,44 50,96 6,44"/><polyline class="d-facet" points="6,44 50,66 94,44"/><path class="d-facet" d="M50 66 50 96"/>`,
+    12: `<polygon class="d-body" points="50,4 95,37 78,92 22,92 5,37"/><polygon class="d-facet" points="50,22 75,41 66,72 34,72 25,41"/>`,
+    20: `<polygon class="d-body" points="50,4 92,28 92,72 50,96 8,72 8,28"/><polygon class="d-facet" points="50,20 80,71 20,71"/><path class="d-facet" d="M50 20 50 4M50 20 8 28M50 20 92 28M20 71 8 28M20 71 8 72M20 71 50 96M80 71 92 28M80 71 92 72M80 71 50 96"/>`,
+    100: `<polygon class="d-body" points="50,4 94,44 50,96 6,44"/><polyline class="d-facet" points="6,44 50,66 94,44"/>`
+  };
+  const ty = { 4: 64, 6: 50, 8: 50, 10: 40, 12: 49, 20: 53, 100: 40 }[s];
+  const txt = String(v);
+  const fs = txt.length > 2 ? 20 : (s === 4 ? 26 : 28);
+  return `<svg class="die ${cls}" viewBox="0 0 100 100" aria-label="d${s} showing ${txt}" role="img">${shapes[s]}<text x="50" y="${ty}" font-size="${fs}">${txt}</text></svg>`;
+}
+
+/* =========================================================
+   Log & choices
+   ========================================================= */
+const logEl = $("#log"), choicesEl = $("#choices"), boardEl = $("#board");
+function scrollToEnd() { requestAnimationFrame(() => { (choicesEl.firstChild ? choicesEl : logEl.lastChild || logEl).scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "end" }); }); }
+function add(html, cls) { const d = document.createElement("div"); d.className = "entry " + cls; d.innerHTML = html; logEl.appendChild(d); scrollToEnd(); return d; }
+const pace = (ms = 320) => sleep(REDUCED || fastMode ? 0 : ms);
+let fastMode = location.hash === "#fast";
+async function narr(t) { add(`<p>${t}</p>`, "narr"); await pace(); }
+async function npc(name, t) { add(`<span class="who">${name}</span><p>${t}</p>`, "npc"); await pace(); }
+async function tip(title, t) { add(`${TWENTY}<div><span class="who">Twenty · ${title}</span>${t.startsWith("<") ? t : `<p>${t}</p>`}</div>`, "dm"); await pace(420); }
+function you(t) { add(`<span class="who">${esc(S.name || "You")}</span>${t}`, "you"); }
+function sys(t, cls = "") { return add(t, "sys " + cls); }
+function chip(n, sides = 20) { return `<span class="chip ${sides === 20 && n === 20 ? "n20" : ""} ${sides === 20 && n === 1 ? "n1" : ""}">${n}</span>`; }
+function scene(tag, title) {
+  $("#chapterTag").textContent = tag; $("#sceneTitle").textContent = title;
+  logEl.innerHTML = ""; choicesEl.innerHTML = ""; boardEl.innerHTML = "";
+  window.scrollTo({ top: 0 });
+}
+
+function choose(opts, { prompt } = {}) {
+  return new Promise(res => {
+    choicesEl.innerHTML = "";
+    if (prompt) { const p = document.createElement("div"); p.className = "prompt"; p.innerHTML = prompt; choicesEl.appendChild(p); }
+    const grid = document.createElement("div"); grid.className = "choice-grid";
+    opts.forEach((o, i) => {
+      const b = document.createElement("button");
+      b.className = "choice" + (o.cls ? " " + o.cls : "");
+      b.disabled = !!o.disabled;
+      b.innerHTML = `<span class="key">${i + 1}</span><span class="lbl">${o.label}</span>${o.tag ? `<span class="tag">${o.tag}</span>` : ""}${o.sub ? `<span class="sub">${o.sub}</span>` : ""}`;
+      b.onclick = () => { choicesEl.innerHTML = ""; sfx("click"); res(o.value !== undefined ? o.value : i); };
+      grid.appendChild(b);
+    });
+    choicesEl.appendChild(grid);
+    scrollToEnd();
+  });
+}
+const cont = (label = "Continue") => choose([{ label, value: true, cls: "primary" }]);
+
+/* =========================================================
+   Toasts, lore, badges, XP
+   ========================================================= */
+function toast(kind, text) {
+  const t = document.createElement("div"); t.className = "toast"; t.innerHTML = `<small>${kind}</small>${text}`;
+  const box = $("#toasts"); box.appendChild(t);
+  while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => t.classList.add("out"), 3600); setTimeout(() => t.remove(), 4100);
+}
+function learn(...keys) {
+  keys.forEach(k => {
+    if (S.lore.includes(k)) return;
+    const e = CODEX.find(c => c[0] === k); if (!e) return;
+    S.lore.push(k); S.fresh.push(k);
+    toast("New rulebook page", e[1]); sfx("chime");
+  });
+  hud();
+}
+function badge(k) {
+  if (S.badges.includes(k)) return;
+  S.badges.push(k); toast("Achievement unlocked", `<b>${BADGES[k][0]}</b>`); sfx("good");
+}
+async function gainXP(n, why) {
+  S.xp += n; sys(`<b>+${n} XP</b> · ${why} <span style="opacity:.7">(${S.xp} / 300 to reach level 2)</span>`, "good"); hud();
+  if (first("xpTip")) { learn("xp"); await tip("Experience points", `You earn <b>XP</b> for overcoming challenges, and not only by fighting. Sneaking past, outwitting, or talking down a monster counts too. At <b>300 XP</b> you reach level 2. (Many groups skip XP and level up when the story hits a milestone.)`); }
+}
+
+/* =========================================================
+   HUD, sheet, codex
+   ========================================================= */
+function myAC() { return S.ac + (CB && CB.shieldUp ? 5 : 0); }
+function hud() {
+  $("#codexCount").textContent = `${S.lore.length}/${CODEX.length}`;
+  if (!S.cls || !S.scores) { $("#hud").classList.remove("playing"); $("#hudHero").hidden = true; $("#btnSheet").hidden = true; return; }
+  $("#hudHero").hidden = false; $("#btnSheet").hidden = false; $("#hud").classList.add("playing");
+  $("#hudName").textContent = S.name;
+  $("#hudClass").textContent = `Level ${S.level} ${SPECIES[S.species].name} ${C().name}`;
+  const pct = Math.max(0, Math.min(100, S.hp / S.maxHp * 100));
+  $("#hpFill").style.width = pct + "%";
+  $("#hpBar").classList.toggle("low", pct <= 50);
+  $("#hpText").textContent = `${S.hp}/${S.maxHp}${S.thp ? ` +${S.thp}` : ""}`;
+  $("#acText").textContent = myAC();
+  $("#slotText").innerHTML = S.maxSlots ? `Slots <b>${"●".repeat(S.slots)}${"○".repeat(Math.max(0, S.maxSlots - S.slots))}</b>` : "";
+  $("#xpText").textContent = S.xp;
+  const ins = []; if (S.inspiration) ins.push("Inspired"); if (S.bardic) ins.push("Bardic d6"); if (S.potions) ins.push(`Potion ×${S.potions}`);
+  $("#inspText").textContent = ins.join(" · ");
+}
+function renderSheet() {
+  const c = C();
+  const abil = ABILS.map(a => `<div><small>${ABBR[a]}</small><b>${fmt(abilMod(a))}</b><span>score ${S.scores[a]}</span></div>`).join("");
+  const saves = ABILS.map(a => `<li class="${c.saves.includes(a) ? "p" : ""}"><span>${ABIL[a]}</span><span>${fmt(saveBonus(a))}</span></li>`).join("");
+  const skills = Object.keys(SKILLS).map(k => `<li class="${isProf(k) ? "p" : ""}"><span>${SKILL_NAME[k]} <small style="opacity:.6">${ABBR[SKILLS[k]]}</small></span><span>${fmt(skillBonus(k))}</span></li>`).join("");
+  const w = c.weapon;
+  let attacks = `<li><b>${w.name}:</b> ${fmt(abilMod(w.stat) + PB)} to hit, ${w.dice}${fmt(abilMod(w.stat))} ${w.type}</li>`;
+  if (c.offhand) attacks += `<li><b>${c.offhand.name}:</b> bonus action after attacking, ${fmt(abilMod("dex") + PB)} to hit, 1d4 piercing (no modifier on damage)</li>`;
+  if (c.cantrip) attacks += `<li><b>${c.cantrip.name}:</b> ${c.cantrip.desc}</li>`;
+  const spellLine = c.slots ? `<p style="margin:6px 0 0;color:var(--ink-dim)">Spell attack ${fmt(spellMod() + PB)} · Spell save DC ${spellDC()} · Slots ${S.slots}/${S.maxSlots}</p>` : "";
+  $("#sheetBody").innerHTML = `
+    <div style="font-size:20px;font-weight:700">${esc(S.name)}</div>
+    <div style="color:var(--ink-dim)">Level ${S.level} ${SPECIES[S.species].name} ${c.name} · ${BACKGROUNDS[S.bg].name} background</div>
+    <div class="sh-sec"><div class="sheet-card">
+      <div><small>Hit Points</small><b>${S.hp}/${S.maxHp}</b><span>d${c.hd} Hit Die (${S.hitDice} left)</span></div>
+      <div><small>Armor Class</small><b>${myAC()}</b><span>${c.acNote}</span></div>
+      <div><small>Proficiency</small><b>+${PB}</b><span>Added to things you're trained in</span></div>
+      <div><small>Initiative</small><b>${fmt(abilMod("dex"))}</b><span>Your DEX modifier</span></div>
+      <div><small>Speed</small><b>30</b><span>Feet per turn</span></div>
+      <div><small>Passive Perception</small><b>${passivePerception()}</b><span>10 + Perception</span></div>
+    </div></div>
+    <div class="sh-sec"><h3>Abilities (modifier, then score)</h3><div class="sh-abils">${abil}</div></div>
+    <div class="sh-sec"><h3>Saving throws</h3><ul class="sh-list">${saves}</ul></div>
+    <div class="sh-sec"><h3>Skills (● proficient)</h3><ul class="sh-list">${skills}</ul></div>
+    <div class="sh-sec"><h3>Attacks & spells</h3><ul class="sh-feat">${attacks}</ul>${spellLine}</div>
+    <div class="sh-sec"><h3>Features & traits</h3><ul class="sh-feat">${c.features.concat(S.feats || []).map(f => `<li>${f}</li>`).join("")}${SPECIES[S.species].traits.map(f => `<li>${f}</li>`).join("")}</ul></div>
+    <div class="sh-sec"><h3>Inventory</h3><ul class="sh-feat"><li>${S.gold} gold pieces</li><li>Potion of Healing ×${S.potions} (2d4 + 2 HP)</li><li>Explorer's pack, rations, rope, a very nice hat</li></ul></div>`;
+}
+function renderCodex() {
+  $("#codexBody").innerHTML = CODEX.map(([k, t, body]) => S.lore.includes(k)
+    ? `<div class="codex-entry ${S.fresh.includes(k) ? "fresh" : ""}"><h3>${t}</h3><p>${body}</p></div>`
+    : `<div class="codex-entry locked"><h3>? ? ?</h3><p>Keep playing to unlock this page.</p></div>`).join("");
+  S.fresh = [];
+}
+function openDrawer(id) { const d = $(id); d.hidden = false; d.querySelector(".x").focus(); }
+$("#btnSheet").onclick = () => { renderSheet(); openDrawer("#sheetDrawer"); };
+$("#btnCodex").onclick = () => { renderCodex(); openDrawer("#codexDrawer"); };
+document.querySelectorAll(".drawer").forEach(d => d.addEventListener("click", e => { if (e.target === d || e.target.closest("[data-close]")) d.hidden = true; }));
+$("#btnSound").onclick = () => { soundOn = !soundOn; $("#btnSound").textContent = soundOn ? "Sound on" : "Sound off"; $("#btnSound").setAttribute("aria-pressed", soundOn); };
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "Escape") { document.querySelectorAll(".drawer").forEach(d => d.hidden = true); return; }
+  if (!$("#tray").hidden) {
+    if (e.key === "Enter" || e.key === " ") { const b = $("#trayActions button.primary"); if (b) { e.preventDefault(); b.click(); } }
+    return;
+  }
+  if (/^[1-9]$/.test(e.key)) { const bs = choicesEl.querySelectorAll("button.choice"); const b = bs[+e.key - 1]; if (b && !b.disabled) b.click(); }
+  if (e.key === "Enter" || e.key === " ") { const bs = choicesEl.querySelectorAll("button.choice"); if (bs.length === 1 && document.activeElement === document.body) { e.preventDefault(); bs[0].click(); } }
+});
+
+/* =========================================================
+   Dice tray
+   ========================================================= */
+function parseDice(str) { return str.split("+").map(p => { const [n, s] = p.split("d").map(Number); return { n: n || 1, s }; }); }
+function trayButtons(btns) {
+  return new Promise(res => {
+    const box = $("#trayActions"); box.innerHTML = "";
+    btns.forEach(b => {
+      const el = document.createElement("button"); el.className = b.cls || ""; el.innerHTML = b.label;
+      el.onclick = () => { sfx("click"); res(b.value); }; box.appendChild(el);
+    });
+    const p = box.querySelector(".primary"); if (p) setTimeout(() => p.focus({ preventScroll: true }), 30);
+  });
+}
+async function animateDice(els, finals) {
+  sfx("roll");
+  els.forEach(e => e.classList.add("rolling"));
+  const steps = REDUCED || fastMode ? 1 : 9;
+  for (let i = 0; i < steps; i++) {
+    els.forEach((e, j) => { const s = +e.dataset.s; e.querySelector("text").textContent = s === 100 ? rnd(100) : rnd(s); });
+    await sleep(65);
+  }
+  els.forEach((e, j) => { e.classList.remove("rolling"); e.querySelector("text").textContent = finals[j]; e.classList.add("land"); });
+}
+function closeTray() { $("#tray").hidden = true; }
+
+const D20_KINDS = ["check", "attack", "save", "death", "init", "enemysave", "contest", "free20"];
+const KIND_LABEL = { check: "Ability check", attack: "Attack roll", save: "Saving throw", death: "Death saving throw", init: "Initiative", enemysave: "Enemy saving throw", contest: "Contest", damage: "Damage roll", heal: "Healing", free20: "Roll" };
+
+async function roll(o) {
+  const tray = $("#tray"); tray.hidden = false;
+  const isD20 = D20_KINDS.includes(o.kind);
+  const mods = o.mods || [];
+  const modSum = mods.reduce((a, m) => a + m.val, 0);
+  const adv = o.adv || 0;
+  const lucky = isD20 && o.player && S.species === "halfling";
+  $("#trayKind").textContent = KIND_LABEL[o.kind] || "Roll";
+  $("#trayTitle").textContent = o.title;
+  $("#traySub").innerHTML = o.sub || "";
+  $("#trayMath").textContent = ""; $("#trayVerdict").textContent = ""; $("#trayVerdict").className = "tray-verdict"; $("#trayNote").innerHTML = "";
+
+  let groups = isD20 ? [{ n: adv ? 2 : 1, s: 20 }] : parseDice(o.dice);
+  if (o.crit) groups = groups.map(g => ({ ...g, n: g.n * 2 }));
+  const diceLabel = isD20 ? (adv ? `2d20 <small>(${adv > 0 ? "advantage: keep higher" : "disadvantage: keep lower"})</small>` : "d20") : groups.map(g => `${g.n}d${g.s}`).join(" + ") + (o.crit ? " <small>(critical: dice doubled)</small>" : "");
+  const terms = [`<span class="term">${diceLabel}</span>`].concat(mods.filter(m => m.val !== 0 || m.show).map(m => `<span class="term">${m.val < 0 ? "−" : "+"} ${Math.abs(m.val)} <small>${m.label}</small></span>`));
+  if (o.target != null) terms.push(`<span class="term vs">vs ${o.targetLabel || "DC"} ${o.target}</span>`);
+  $("#trayFormula").innerHTML = terms.join("");
+
+  const sides = []; groups.forEach(g => { for (let i = 0; i < g.n; i++) sides.push(g.s); });
+  const diceBox = $("#trayDice");
+  diceBox.className = "tray-dice" + (sides.length > 3 ? " many" : "");
+  diceBox.innerHTML = sides.map(s => dieSVG(s, "?", s === 20 ? "" : "")).join("");
+  const els = [...diceBox.querySelectorAll(".die")]; els.forEach((e, i) => e.dataset.s = sides[i]);
+
+  if (!o.auto) await trayButtons([{ label: o.rollLabel || "Roll!", cls: "primary", value: 1 }]);
+  else { $("#trayActions").innerHTML = ""; await sleep(fastMode ? 0 : 450); }
+
+  let vals = sides.map(s => rnd(s));
+  await animateDice(els, vals);
+  const notes = [];
+  if (lucky) {
+    for (let i = 0; i < vals.length; i++) if (vals[i] === 1) {
+      notes.push("Halfling <b>Lucky</b>: you rolled a 1, so you reroll it.");
+      await sleep(fastMode ? 0 : 450); vals[i] = rnd(20); await animateDice([els[i]], [vals[i]]);
+    }
+  }
+  if (o.player && isD20 && first("firstroll")) badge("firstroll");
+
+  let res = {};
+  const compute = () => {
+    let nat = null, total;
+    if (isD20) {
+      nat = adv > 0 ? Math.max(...vals) : adv < 0 ? Math.min(...vals) : vals[0];
+      if (adv && vals.length === 2) { const keep = vals.indexOf(nat); els.forEach((e, i) => e.classList.toggle("dim", i !== keep)); }
+      total = nat + modSum;
+    } else total = vals.reduce((a, b) => a + b, 0) + modSum;
+    total += (res.bardicAdd || 0);
+    const r = { nat, total, vals, crit: false, success: null };
+    if (o.kind === "attack") { r.crit = nat === 20; r.success = nat === 20 ? true : nat === 1 ? false : total >= o.target; }
+    else if (o.kind === "contest") r.success = total > o.target ? true : total < o.target ? false : "tie";
+    else if (o.target != null) r.success = total >= o.target;
+    return r;
+  };
+  const show = r => {
+    const parts = [isD20 ? String(r.nat) : vals.join(" + ")].concat(mods.filter(m => m.val !== 0 || m.show).map(m => `${m.val < 0 ? "−" : "+"} ${Math.abs(m.val)}`));
+    if (res.bardicAdd) parts.push(`+ ${res.bardicAdd} (bardic)`);
+    $("#trayMath").textContent = (parts.length > 1 ? parts.join(" ") + " = " : "Total ") + r.total;
+    if (isD20) els.forEach((e, i) => { const v = vals[i]; e.classList.toggle("gold", v === 20); e.classList.toggle("red", v === 1); });
+    const V = $("#trayVerdict"); V.className = "tray-verdict";
+    let text = "";
+    if (o.kind === "attack") { text = r.crit ? "Critical hit!" : r.success ? "Hit!" : "Miss"; V.classList.add(r.crit ? "crit" : r.success ? "good" : "bad"); }
+    else if (o.kind === "enemysave") { text = r.success ? `${o.foeName} resists!` : `${o.foeName} fails!`; V.classList.add(r.success ? "bad" : "good"); }
+    else if (o.kind === "death") { text = r.nat === 20 ? "Back on your feet!" : r.nat === 1 ? "Two failures!" : r.success ? "Success" : "Failure"; V.classList.add(r.nat === 20 ? "crit" : r.success ? "good" : "bad"); }
+    else if (o.kind === "contest") { text = r.success === "tie" ? "Tie!" : r.success ? "You win!" : "You lose"; if (r.success !== "tie") V.classList.add(r.success ? "good" : "bad"); }
+    else if (o.kind === "init") text = `Initiative ${r.total}`;
+    else if (o.kind === "damage") { text = `${r.total} damage`; if (r.total > 0) V.classList.add("good"); }
+    else if (o.kind === "heal") { text = `+${r.total} HP`; V.classList.add("good"); }
+    else if (o.kind === "free20") text = String(r.total);
+    else if (r.success != null) { text = r.success ? "Success" : "Failure"; V.classList.add(r.success ? "good" : "bad"); }
+    V.textContent = text;
+    if (isD20 && o.kind !== "enemysave") {
+      if (r.nat === 20) notes.push(o.kind === "attack" ? "Natural 20! Critical hits double the damage dice." : o.kind === "check" || o.kind === "save" ? "Natural 20! Strictly by the rules it's just a high number on checks and saves, but many tables treat it as extra-awesome." : "");
+      if (r.nat === 1 && o.kind === "attack") notes.push("Natural 1: an automatic miss.");
+    }
+    $("#trayNote").innerHTML = [...new Set(notes)].filter(Boolean).join("<br>");
+  };
+  res = compute(); show(res);
+  if (o.player && isD20) {
+    if (res.nat === 20) { sfx("crit"); badge("nat20"); }
+    else if (res.nat === 1) { badge("nat1"); }
+  }
+  const goodForYou = o.kind === "enemysave" ? res.success === false : res.success === true;
+  if (res.success === true || res.success === false) sfx(goodForYou ? (res.crit ? "crit" : "good") : "bad");
+
+  // Offer inspiration on a failed d20 roll
+  let accepted = false;
+  while (o.player && isD20 && res.success === false && o.kind !== "death" && (S.inspiration || S.bardic)) {
+    const btns = [];
+    if (S.inspiration) btns.push({ label: "Spend Heroic Inspiration: reroll the d20", cls: "alt", value: "heroic" });
+    if (S.bardic) btns.push({ label: "Add Pip's Bardic Inspiration (+1d6)", cls: "alt", value: "bardic" });
+    btns.push({ label: "Accept the result", cls: "primary", value: "accept" });
+    if (first("inspTip")) { learn("inspiration"); $("#trayNote").innerHTML += `<br><b>Twenty:</b> you failed, but you have Inspiration to spend. This is exactly when to use it.`; }
+    const v = await trayButtons(btns);
+    if (v === "accept") { accepted = true; break; }
+    if (v === "heroic") {
+      S.inspiration = false;
+      const idx = adv ? vals.indexOf(res.nat) : 0;
+      vals[idx] = rnd(20); await animateDice([els[idx]], [vals[idx]]);
+      if (lucky && vals[idx] === 1) { vals[idx] = rnd(20); await animateDice([els[idx]], [vals[idx]]); }
+    } else {
+      S.bardic = false;
+      const b = rnd(6); res.bardicAdd = (res.bardicAdd || 0) + b;
+      diceBox.insertAdjacentHTML("beforeend", dieSVG(6, b, "land gold")); sfx("roll");
+    }
+    const keepAdd = res.bardicAdd; res = compute(); res.bardicAdd = keepAdd; show(res);
+    if (res.success) sfx("good"); else sfx("bad");
+    hud();
+  }
+
+  const keep = o.keepOpen || (o.keepOpenOnSuccess && res.success === true);
+  const label = keep && o.hitLabel ? o.hitLabel : (o.contLabel || "Continue");
+  if (!accepted) await trayButtons([{ label, cls: "primary", value: 1 }]);
+  if (!keep) closeTray();
+  return res;
+}
+
+async function skillCheck(sk, dc, o = {}) {
+  const a = SKILLS[sk];
+  const mods = [{ label: ABBR[a], val: abilMod(a), show: true }];
+  if (isProf(sk)) mods.push({ label: "Proficiency", val: PB });
+  const profNote = isProf(sk) ? `You're proficient in ${SKILL_NAME[sk]}, so you add your +${PB} proficiency bonus.` : `You aren't proficient in ${SKILL_NAME[sk]}, so it's just your ${ABBR[a]} modifier.`;
+  return roll({ kind: "check", title: `${ABIL[a]} (${SKILL_NAME[sk]}) check`, sub: (o.sub ? o.sub + " " : "") + profNote, mods, target: dc, adv: o.adv || 0, player: true });
+}
+async function savingThrow(a, dc, o = {}) {
+  const mods = [{ label: ABBR[a], val: abilMod(a), show: true }];
+  if (C().saves.includes(a)) mods.push({ label: "Proficiency", val: PB });
+  return roll({ kind: "save", title: `${ABIL[a]} saving throw`, sub: o.sub || "", mods, target: dc, adv: o.adv || 0, player: true });
+}
+
+/* =========================================================
+   Healing & damage
+   ========================================================= */
+function damagePlayer(n) { let r = n; if (S.thp > 0) { const a = Math.min(S.thp, r); S.thp -= a; r -= a; } S.hp = Math.max(0, S.hp - r); hud(); }
+function healPlayer(n) { S.hp = Math.min(S.maxHp, S.hp + n); hud(); }
+
+/* =========================================================
+   Combat
+   ========================================================= */
+let CB = null;
+function foeStatus(f) {
+  if (f.state === "fled") return ["Fled", "gone"];
+  if (f.state === "surrendered") return ["Surrendered", "gone"];
+  if (f.hp <= 0) return ["Defeated", "gone"];
+  if (f.hp === f.maxHp) return ["Unhurt", "unhurt"];
+  if (f.hp > f.maxHp / 2) return ["Wounded", "unhurt"];
+  if (f.hp > f.maxHp / 4) return ["Bloodied", "bloodied"];
+  return ["Barely standing", "dying"];
+}
+function renderBoard() {
+  const F = CB; if (!F) { boardEl.innerHTML = ""; return; }
+  const ord = F.order.map(o => {
+    const name = o.t === "player" ? esc(S.name) : o.t === "pip" ? "Pip" : o.f.name;
+    const down = o.t === "player" ? S.hp <= 0 : o.t === "pip" ? S.pip.hp <= 0 : o.f.state !== "up";
+    return `<span class="ord ${F.active === o ? "active" : ""} ${down ? "down" : ""}"><span class="ini">${o.init}</span>${name}</span>`;
+  }).join("");
+  const maxD = 70; const pos = d => 6 + (Math.min(d, maxD) / maxD) * 88; const fpos = d => pos(Math.max(d, 12));
+  const toks = [`<div class="tok you ${S.hp <= 0 ? "down" : ""}" style="left:${pos(0)}%"><i>${esc(S.name[0] || "Y")}</i><span>You</span></div>`];
+  const pipF = F.foes.find(f => f.id === F.pipTarget && f.state === "up");
+  toks.push(`<div class="tok pip lane2 ${S.pip.hp <= 0 ? "down" : ""}" style="left:${pipF ? fpos(pipF.dist) : pos(0)}%"><i>P</i></div>`);
+  F.foes.forEach((f, i) => { if (f.state === "fled") return; toks.push(`<div class="tok foe ${f.boss ? "boss" : ""} ${f.state !== "up" ? "down" : ""} ${i % 2 ? "" : ""}" style="left:${fpos(f.dist) + (i % 2 ? 2 : 0)}%"><i>${f.name[0]}</i><span>${f.dist <= 5 ? "adjacent" : f.dist + " ft"}</span></div>`); });
+  const ticks = [0, 30, 60].map(d => `<span class="ft" style="left:${pos(d)}%">${d} ft</span>`).join("");
+  const foes = F.foes.map(f => { const [t, c] = foeStatus(f); return `<div class="foecard"><b>${f.name}</b><span class="st ${c}">${t}</span></div>`; }).join("");
+  let econ = "";
+  if (F.T && F.active && F.active.t === "player") {
+    const T = F.T;
+    econ = `<div class="econ"><span class="pip-e ${T.move <= 0 ? "used" : ""}">Move ${T.move} ft</span><span class="pip-e ${T.action ? "" : "used"}">Action</span><span class="pip-e ${T.bonus ? "" : "used"}">Bonus action</span><span class="pip-e ${F.reactionUsed ? "used" : ""}">Reaction</span><span class="pip-hp">Pip: ${S.pip.hp}/${S.pip.maxHp} HP</span></div>`;
+  } else econ = `<div class="econ"><span class="pip-hp">Pip: ${S.pip.hp}/${S.pip.maxHp} HP</span></div>`;
+  boardEl.innerHTML = `<div class="order" aria-label="Initiative order">${ord}</div><div class="track">${ticks}${toks.join("")}</div><div class="foes">${foes}</div>${econ}`;
+}
+
+async function combat(cfg) {
+  const snapshot = JSON.stringify(S);
+  let res = await runCombat(cfg);
+  while (res === "defeat") {
+    CB = null; renderBoard();
+    await narr(`Darkness closes in. Somewhere far away, a twenty-sided die clatters across a table...`);
+    await tip("Time out!", `<p>Your party has fallen. In a real game this could mean a dead character, though many DMs have the monsters capture you instead. Here, I'm rewinding to the start of the fight.</p><p>Since you're still learning, I'll give you <b>5 temporary hit points</b>: a shield of HP that soaks up damage first.</p>`);
+    learn("thp");
+    const flags = S.flags, lore = S.lore, badges = S.badges, quiz = S.quiz;
+    S = JSON.parse(snapshot); S.flags = flags; S.lore = lore; S.badges = badges; S.quiz = quiz;
+    S.thp = 5; hud();
+    await cont("Try the fight again");
+    res = await runCombat(cfg);
+  }
+  return res;
+}
+
+async function runCombat(cfg) {
+  const foes = cfg.enemies.map((e, i) => ({ ...e, id: "f" + i, maxHp: e.hp, state: "up" }));
+  const F = { foes, cfg, round: 1, order: [], active: null, T: null, pipTarget: null, lastTarget: null, deathS: 0, deathF: 0, stable: false, dead: false, dodge: false, shieldUp: false, reactionUsed: false, fled: false, creativeUsed: false };
+  CB = F;
+  renderBoard();
+  if (cfg.tutorial) {
+    learn("init");
+    await tip("Combat begins: roll initiative", `Combat happens in turns. First, everyone rolls <b>initiative</b>: d20 + Dexterity modifier. The highest goes first. The DM rolls for the monsters.`);
+  }
+  const pi = await roll({ kind: "init", title: "Roll initiative!", sub: "d20 + your Dexterity modifier decides when you act.", mods: [{ label: "DEX", val: abilMod("dex"), show: true }], player: true });
+  const order = [{ t: "player", init: pi.total, tb: 1 }, { t: "pip", init: rnd(20) + 3, tb: 0 }];
+  foes.forEach(f => order.push({ t: "foe", f, init: rnd(20) + f.dexMod, tb: 0 }));
+  order.sort((a, b) => b.init - a.init || b.tb - a.tb);
+  F.order = order; renderBoard();
+  sys(`Turn order: ${order.map(o => `${o.t === "player" ? "<b>You</b>" : o.t === "pip" ? "Pip" : o.f.name} (${o.init})`).join(" → ")}`);
+  if (cfg.tutorial) {
+    learn("monsterhp");
+    await tip("Reading the board", `<p>The bar at the top shows the turn order and how far away everyone is. One round is about <b>6 seconds</b> of action.</p><p>Notice that you can't see the goblins' exact hit points. At a real table the DM describes how hurt a monster looks instead. <b>Bloodied</b> means it's at half health or less.</p>`);
+  }
+  while (true) {
+    add(`Round ${F.round}`, "round");
+    for (const o of order) {
+      if (outcome(F)) return finish(F);
+      F.active = o; renderBoard();
+      if (o.t === "player") await playerTurn(F);
+      else if (o.t === "pip") await pipTurn(F);
+      else if (o.f.state === "up") await foeTurn(F, o.f);
+      F.T = null; renderBoard();
+    }
+    if (outcome(F)) return finish(F);
+    F.round++;
+  }
+}
+function outcome(F) {
+  if (F.foes.every(f => f.state !== "up")) return "victory";
+  if (F.dead) return "defeat";
+  if (S.hp <= 0 && S.pip.hp <= 0) return "defeat";
+  return null;
+}
+async function finish(F) {
+  const out = outcome(F);
+  F.active = null; renderBoard();
+  if (out === "defeat") return "defeat";
+  F.shieldUp = false;
+  await narr(F.foes.some(f => f.state === "surrendered") ? `The fight is over. Not every victory needs a final blow.` : `The last enemy falls. The fight is over.`);
+  if (S.hp <= 0) { S.hp = 1; await npc("Pip", `"Up you get!" Pip presses a cool hand to your forehead and hums a quick healing tune. You wake with 1 hit point.`); }
+  if (S.pip.hp <= 0) { S.pip.hp = 1; await narr(`You shake Pip awake. She groans, sits up, and checks that her lute survived.`); }
+  hud();
+  CB = null;
+  boardEl.innerHTML = "";
+  return "victory";
+}
+
+function playerWeapon() { return C().weapon; }
+function upFoes(F) { return F.foes.filter(f => f.state === "up"); }
+
+function turnOptions(F, T) {
+  const c = C(), up = upFoes(F), adj = up.filter(f => f.dist <= 5), far = up.filter(f => f.dist > 5);
+  const w = c.weapon, o = [];
+  o.push({ label: `Attack with ${w.name}`, tag: "Action", sub: adj.length ? `${fmt(abilMod(w.stat) + PB)} to hit · ${w.dice}${fmt(abilMod(w.stat))} ${w.type}` : "Melee only: no enemy within 5 ft. Move first.", value: "attack", disabled: !T.action || !adj.length });
+  if (c.cantrip) o.push({ label: `Cast ${c.cantrip.name}`, tag: "Action · cantrip", sub: c.cantrip.desc, value: "cantrip", disabled: !T.action });
+  if (c.spell) o.push({ label: `Cast ${c.spell.name}`, tag: `Action · slot (${S.slots} left)`, sub: c.spell.desc, value: "spell", disabled: !T.action || S.slots < 1 });
+  o.push({ label: "Move toward an enemy", tag: "Movement", sub: far.length ? `You have ${T.move} ft of movement left.` : "You're already next to every enemy.", value: "move", disabled: T.move <= 0 || !far.length });
+  if (S.cls === "fighter") o.push({ label: "Second Wind", tag: "Bonus action", sub: `Heal 1d10 + 1. ${S.secondWind} use${S.secondWind === 1 ? "" : "s"} left.`, value: "wind", disabled: !T.bonus || S.secondWind < 1 });
+  if (S.cls === "rogue") o.push({ label: "Off-hand dagger attack", tag: "Bonus action", sub: T.attacked ? "Two-weapon fighting: a second light-weapon attack, no modifier on damage." : "Only after you attack with your shortsword this turn.", value: "offhand", disabled: !T.bonus || !T.attacked || !adj.length });
+  if (S.cls === "cleric") o.push({ label: "Cast Healing Word", tag: `Bonus action · slot (${S.slots} left)`, sub: "Heal yourself or Pip for 2d4 + WIS from 60 ft away.", value: "hword", disabled: !T.bonus || S.slots < 1 });
+  if (S.potions > 0) o.push({ label: "Drink a Potion of Healing", tag: "Bonus action", sub: "Heal 2d4 + 2. (A bonus action in the 2024 rules; an action in 2014.)", value: "potion", disabled: !T.bonus });
+  o.push({ label: "Dodge", tag: "Action", sub: "Attacks against you have disadvantage until your next turn.", value: "dodge", disabled: !T.action });
+  o.push({ label: "Dash", tag: "Action", sub: "Gain 30 ft of extra movement this turn.", value: "dash", disabled: !T.action || !far.length });
+  if (F.cfg.creative) o.push({ label: "Try something creative", tag: "Action", sub: "Use the room. Describe a plan, roll a check.", value: "creative", disabled: !T.action || F.creativeUsed });
+  const boss = F.foes.find(f => f.boss && f.state === "up");
+  if (F.cfg.parley && boss && boss.hp <= boss.maxHp / 2) o.push({ label: "Demand Snaggletooth's surrender", tag: "Action", sub: "He's bloodied and scared. Talk instead of fight.", value: "parley", disabled: !T.action });
+  o.push({ label: "End turn", value: "end", cls: "end" });
+  return o;
+}
+
+async function pickFoe(F, list, prompt) {
+  if (list.length === 1) return list[0];
+  const v = await choose(list.map(f => ({ label: f.name, sub: `${foeStatus(f)[0]} · ${f.dist <= 5 ? "next to you" : f.dist + " ft away"} · AC ${f.ac}`, value: f.id })).concat([{ label: "Back", value: "back", cls: "end" }]), { prompt });
+  return v === "back" ? null : F.foes.find(f => f.id === v);
+}
+
+async function playerTurn(F) {
+  F.dodge = false; F.shieldUp = false; F.reactionUsed = false; hud();
+  if (S.hp <= 0) return deathSave(F);
+  const T = { move: 30, action: 1, bonus: 1, attacked: false, sneakUsed: false };
+  F.T = T; renderBoard();
+  if (F.cfg.tutorial && first("turnTip")) {
+    learn("turn", "actions");
+    await tip("Your turn", `<p>On your turn you get:</p><p><b>Movement</b> up to 30 feet. <b>One action</b> (attack, cast a spell, Dodge, Dash...). <b>One bonus action</b>, only if a feature or spell says it uses one.</p><p>You can do them in any order. ${upFoes(F).some(f => f.dist <= 5) ? "A goblin is right next to you, so you can attack it with your weapon without moving." : "The nearest goblin is " + Math.min(...upFoes(F).map(f => f.dist)) + " feet away, so to hit it with a melee weapon you'll need to move first."} ${C().cantrip ? `You also have a ranged cantrip, ${C().cantrip.name}, that works from right here.` : ""}</p>`);
+  }
+  while (true) {
+    if (outcome(F)) return;
+    const opts = turnOptions(F, T);
+    if (opts.filter(o => o.value !== "end").every(o => o.disabled)) { sys("You've used everything useful this turn."); await pace(300); break; }
+    const v = await choose(opts, { prompt: `Your turn · ${T.move} ft movement · ${T.action ? "action ready" : "action used"} · ${T.bonus ? "bonus action ready" : "bonus action used"}` });
+    if (v === "end") break;
+    await doOption(F, T, v);
+    renderBoard();
+  }
+}
+
+async function doOption(F, T, v) {
+  const c = C(), up = upFoes(F);
+  if (v === "attack") {
+    const t = await pickFoe(F, up.filter(f => f.dist <= 5), "Attack whom?"); if (!t) return;
+    T.action = 0; T.attacked = true; renderBoard();
+    await playerAttack(F, T, t, { ...c.weapon, ranged: false });
+  } else if (v === "offhand") {
+    const t = await pickFoe(F, up.filter(f => f.dist <= 5), "Stab whom?"); if (!t) return;
+    T.bonus = 0; renderBoard();
+    await playerAttack(F, T, t, { ...c.offhand, ranged: false }, { noDmgMod: true });
+  } else if (v === "cantrip") {
+    const t = await pickFoe(F, up, `Cast ${c.cantrip.name} at whom?`); if (!t) return;
+    T.action = 0; renderBoard();
+    if (first("cantripTip")) { learn("spells"); await tip("Cantrips", `A <b>cantrip</b> is a minor spell you can cast as often as you like. It doesn't use a spell slot.`); }
+    if (c.cantrip.id === "firebolt") await playerAttack(F, T, t, { name: "Fire Bolt", dice: "1d10", stat: "int", type: "fire", ranged: true, spell: true });
+    else await sacredFlame(F, t);
+  } else if (v === "spell") {
+    const t = await pickFoe(F, up, `Cast ${c.spell.name} at whom?`); if (!t) return;
+    T.action = 0; S.slots--; hud(); renderBoard();
+    if (first("slotTip")) { learn("spells"); await tip("Spell slots", `Leveled spells cost a <b>spell slot</b>. You have ${S.maxSlots} at level 1 and they only come back after a long rest (wizards can recover one on a short rest). Spend them when it matters.`); }
+    if (c.spell.id === "missile") {
+      await narr(`Three darts of blue light streak from your fingertips. Magic Missile never misses.`);
+      const r = await roll({ kind: "damage", title: "Magic Missile damage", sub: "Three darts, each 1d4 + 1 force damage. No attack roll needed.", dice: "3d4", mods: [{ label: "(+1 per dart)", val: 3 }], player: true });
+      await damageFoe(F, t, r.total, "force");
+    } else {
+      const hit = await playerAttack(F, T, t, { name: "Guiding Bolt", dice: "4d6", stat: "wis", type: "radiant", ranged: true, spell: true });
+      if (hit && t.state === "up") { t.guided = true; await narr(`${t.name} glows with silvery light. The next attack against it has <b>advantage</b>.`); }
+    }
+  } else if (v === "move") {
+    const far = up.filter(f => f.dist > 5);
+    const t = await pickFoe(F, far, "Move toward whom?"); if (!t) return;
+    const need = t.dist - 5; const step = Math.min(need, T.move);
+    T.move -= step; t.dist -= step;
+    F.foes.forEach(f => { if (f !== t && f.state === "up" && f.dist > 5) f.dist = Math.max(5, Math.abs(f.dist - step)); });
+    renderBoard();
+    if (t.dist <= 5) { await narr(`You close ${step} feet and stand toe-to-toe with ${t.name}.`); if (first("moveTip")) await tip("Movement", `You spent ${step} feet of your 30. You can still use your action, and you could even move again after it with whatever's left.`); }
+    else await narr(`You move ${step} feet. ${t.name} is still ${t.dist} feet away. (The Dash action would give you more movement.)`);
+  } else if (v === "dodge") {
+    T.action = 0; F.dodge = true; await narr(`You raise your guard and focus on defense. Attacks against you have <b>disadvantage</b> until your next turn.`);
+    learn("adv");
+  } else if (v === "dash") {
+    T.action = 0; T.move += 30; await narr(`You Dash, gaining an extra 30 feet of movement.`);
+  } else if (v === "wind") {
+    T.bonus = 0; S.secondWind--;
+    const r = await roll({ kind: "heal", title: "Second Wind", sub: "Catch your breath and push through the pain.", dice: "1d10", mods: [{ label: "level", val: 1 }], player: true });
+    healPlayer(r.total); await narr(`You grit your teeth and regain ${r.total} hit points.`);
+  } else if (v === "hword") {
+    const who = S.pip.hp < S.pip.maxHp && S.hp >= S.maxHp ? "pip" : await choose([{ label: "Heal yourself", sub: `${S.hp}/${S.maxHp} HP`, value: "you" }, { label: "Heal Pip", sub: `${S.pip.hp}/${S.pip.maxHp} HP`, value: "pip" }], { prompt: "Healing Word on whom?" });
+    T.bonus = 0; S.slots--; hud();
+    const r = await roll({ kind: "heal", title: "Healing Word", sub: "A word of divine power, spoken as a bonus action.", dice: "2d4", mods: [{ label: "WIS", val: abilMod("wis") }], player: true });
+    if (who === "you") healPlayer(r.total); else { S.pip.hp = Math.min(S.pip.maxHp, S.pip.hp + r.total); }
+    await narr(`Golden light knits ${who === "you" ? "your" : "Pip's"} wounds: +${r.total} HP.`);
+  } else if (v === "potion") {
+    T.bonus = 0; S.potions--;
+    const r = await roll({ kind: "heal", title: "Potion of Healing", sub: "It tastes like cinnamon and pennies.", dice: "2d4", mods: [{ label: "potion", val: 2 }], player: true });
+    healPlayer(r.total); await narr(`You gulp the red potion and regain ${r.total} hit points.`);
+  } else if (v === "creative") {
+    T.action = 0; F.creativeUsed = true; await creativeAction(F);
+  } else if (v === "parley") {
+    T.action = 0; await parley(F);
+  }
+}
+
+async function playerAttack(F, T, t, w, opt = {}) {
+  let pos = 0, neg = 0; const notes = [];
+  if (t.guided) { pos++; notes.push("Guiding Bolt's glow gives you advantage."); }
+  if (t.weakSide && !F.usedWeak) { pos++; notes.push("Nib's tip: Snaggletooth guards his left side badly. Advantage!"); }
+  if (w.ranged && upFoes(F).some(f => f.dist <= 5)) { neg++; notes.push("Ranged attack with an enemy next to you: disadvantage."); }
+  const adv = (pos ? 1 : 0) - (neg ? 1 : 0);
+  if (pos && neg) notes.push("Advantage and disadvantage cancel out: roll one d20.");
+  if (F.cfg.tutorial && first("attackTip")) {
+    learn("attack");
+    await tip("Attack roll", `Roll a d20 and add your attack bonus: your ${ABBR[w.stat]} modifier plus your proficiency bonus. If the total <b>meets or beats the target's Armor Class (AC)</b>, you hit. Goblins have AC 15.`);
+  }
+  const mods = [{ label: ABBR[w.stat], val: abilMod(w.stat), show: true }, { label: "Proficiency", val: PB }];
+  const r = await roll({ kind: "attack", title: `${w.name} → ${t.name}`, sub: notes.join(" ") || (w.spell ? "A spell attack uses your spellcasting ability." : ""), mods, target: t.ac, targetLabel: "AC", adv, player: true, keepOpenOnSuccess: true, hitLabel: "Roll damage" });
+  if (t.guided) t.guided = false;
+  if (t.weakSide) F.usedWeak = true;
+  if (!r.success) { await narr(missLine(w, t)); return false; }
+  let target = t;
+  if (t.redirect && !t.redirectUsed) {
+    const minion = F.foes.find(f => !f.boss && f.state === "up");
+    if (minion) {
+      t.redirectUsed = true; closeTray();
+      await narr(`Snaggletooth grabs ${minion.name} by the collar and yanks him into the way! ${minion.name} takes the hit instead.`);
+      learn("reaction");
+      await tip("Monsters have reactions too", `That was Snaggletooth's <b>Redirect Attack</b> reaction. Monsters follow the same action economy you do: one reaction per round. He's used his trick now.`);
+      target = minion; minion.dist = t.dist;
+    }
+  }
+  const sneakOK = S.cls === "rogue" && T && !T.sneakUsed && (adv > 0 || F.pipTarget === target.id) && adv >= 0 && !w.spell;
+  let dice = w.dice; if (sneakOK) { dice += "+1d6"; T.sneakUsed = true; }
+  if (F.cfg.tutorial && first("dmgTip")) {
+    learn("damage");
+    await tip("Damage", `You hit! Now roll the weapon's damage dice and add the same ability modifier. ${r.crit ? "It's a <b>critical hit</b>, so you roll double the dice." : "On a natural 20 you'd roll double the dice."}`);
+  }
+  if (sneakOK && first("sneakTip")) await tip("Sneak Attack!", `${adv > 0 ? "You have advantage" : "Pip is right next to your target"}, so you add <b>1d6 Sneak Attack</b> damage. Once per turn.`);
+  const dmods = opt.noDmgMod ? [] : [{ label: ABBR[w.stat], val: abilMod(w.stat) }];
+  const d = await roll({ kind: "damage", title: `${w.name} damage`, sub: sneakOK ? "Includes 1d6 Sneak Attack." : "", dice, mods: dmods, crit: r.crit, player: true });
+  await damageFoe(F, target, Math.max(1, d.total), w.type);
+  F.lastTarget = target.id;
+  return true;
+}
+function missLine(w, t) {
+  const lines = [`Your ${w.name} glances off ${t.name}'s rusty armor.`, `${t.name} ducks at the last second.`, `A near miss. ${t.name} cackles nervously.`];
+  if (w.spell) return `Your ${w.name} scorches the ground just past ${t.name}.`;
+  return lines[rnd(lines.length) - 1];
+}
+async function damageFoe(F, f, n, type) {
+  f.hp = Math.max(0, f.hp - n); sfx("hit");
+  if (f.hp <= 0) { f.state = "down"; sys(`${f.name} takes <b>${n}</b> ${type} damage and drops.`, "good"); await narr(f.boss ? `Snaggletooth topples backwards off his cheese throne with a crash.` : `${f.name} crumples to the ground.`); }
+  else { const [st] = foeStatus(f); sys(`${f.name} takes <b>${n}</b> ${type} damage. It looks <b>${st.toLowerCase()}</b>.`); }
+  renderBoard();
+}
+async function sacredFlame(F, t) {
+  if (first("flameTip")) { learn("spellsave", "save"); await tip("Making a monster save", `Sacred Flame doesn't use an attack roll. Instead the <b>target</b> makes a Dexterity saving throw against your <b>spell save DC</b>: 8 + proficiency + WIS = ${spellDC()}. The DM rolls it.`); }
+  const r = await roll({ kind: "enemysave", foeName: t.name, title: `${t.name}'s Dexterity save`, sub: `Radiant flame descends. ${t.name} tries to dodge.`, mods: [{ label: "goblin DEX", val: t.dexMod, show: true }], target: spellDC(), targetLabel: "your spell save DC", auto: true, keepOpenOnSuccess: false, keepOpen: true });
+  if (r.success) { closeTray(); await narr(`${t.name} dives aside. The flame singes nothing but goblin pride.`); return; }
+  const d = await roll({ kind: "damage", title: "Sacred Flame damage", dice: "1d8", mods: [], player: true });
+  await damageFoe(F, t, d.total, "radiant");
+}
+
+async function foeTurn(F, f) {
+  await pace(350);
+  const youUp = S.hp > 0, pipUp = S.pip.hp > 0;
+  if (!youUp && !pipUp) return;
+  if (F.cfg.flee && !f.boss && !f.ranged && f.hp > 0 && f.hp <= 3 && f.dist <= 5 && !F.fled) { F.fled = true; return fleeEvent(F, f); }
+  if (!f.ranged && f.dist > 5) {
+    const step = Math.min(f.speed, f.dist - 5); f.dist -= step; renderBoard();
+    await narr(f.dist <= 5 ? `${f.name} charges ${step} feet and is right in your face!` : `${f.name} advances ${step} feet.`);
+    if (f.dist > 5) return;
+  }
+  let who = !youUp ? "pip" : !pipUp ? "you" : (f.boss || Math.random() < .65) ? "you" : "pip";
+  const n = f.multi || 1;
+  for (let k = 0; k < n; k++) {
+    if (S.hp <= 0 && who === "you") { if (S.pip.hp > 0) who = "pip"; else break; }
+    if (S.pip.hp <= 0 && who === "pip") { if (S.hp > 0) who = "you"; else break; }
+    await foeAttack(F, f, who, k > 0 ? -1 : 0, k > 0);
+  }
+}
+async function foeAttack(F, f, who, adv0, isSecond) {
+  let a = adv0; if (who === "you" && F.dodge) a -= 1;
+  const adv = a < 0 ? -1 : a > 0 ? 1 : 0;
+  const d1 = rnd(20), d2 = rnd(20);
+  const nat = adv > 0 ? Math.max(d1, d2) : adv < 0 ? Math.min(d1, d2) : d1;
+  const ac = who === "you" ? myAC() : S.pip.ac;
+  const total = nat + f.atk; const crit = nat === 20;
+  let hit = crit || (nat !== 1 && total >= ac);
+  const advTxt = adv ? ` <span style="opacity:.75">(${adv > 0 ? "advantage" : "disadvantage"}: ${d1} & ${d2}${F.dodge && who === "you" ? ", you're Dodging" : isSecond ? ", second attack" : ""})</span>` : "";
+  const line = sys(`${f.name} ${isSecond ? "attacks again" : "attacks"} ${who === "you" ? "<b>you</b>" : "Pip"} with a ${f.weapon}: ${chip(nat)}${advTxt} ${fmt(f.atk)} = <b>${total}</b> vs AC ${ac} → ${crit ? '<span class="bad">CRITICAL HIT</span>' : hit ? '<span class="bad">HIT</span>' : '<span class="good">MISS</span>'}`);
+  if (F.cfg.tutorial && who === "you" && first("acTip")) { learn("ac"); await tip("Armor Class at work", `Monsters roll to hit you the same way: d20 + their attack bonus against <b>your AC (${S.ac})</b>. That's why heavy armor matters.`); }
+  if (hit && who === "you" && S.cls === "wizard" && S.slots > 0 && !F.reactionUsed && !crit && total < ac + 5) {
+    learn("reaction");
+    await tip("Reaction: Shield", `You're about to be hit, but a total of ${total} would miss AC ${ac + 5}. You can cast <b>Shield</b> as a <b>reaction</b>: +5 AC until your next turn, for one spell slot. You get one reaction per round.`);
+    const c = await choose([{ label: "Cast Shield!", tag: "Reaction · 1 slot", sub: `AC becomes ${ac + 5}. The attack misses.`, value: true, cls: "primary" }, { label: "Take the hit", sub: "Save the spell slot.", value: false }]);
+    if (c) { S.slots--; F.reactionUsed = true; F.shieldUp = true; hud(); renderBoard(); hit = false; line.innerHTML += ` <span class="good">→ blocked by Shield!</span>`; await narr(`A shimmering wall of force flickers into being. The blade skids off it.`); }
+  }
+  if (!hit) { await pace(250); return; }
+  const g = parseDice(f.dmg)[0]; let dmg = f.dmgMod; const rolls = [];
+  for (let i = 0; i < g.n * (crit ? 2 : 1); i++) { const x = rnd(g.s); rolls.push(x); dmg += x; }
+  sfx("hit");
+  if (who === "you") {
+    damagePlayer(dmg);
+    sys(`You take <b>${dmg}</b> ${f.dmgType} damage <span style="opacity:.7">(${rolls.join("+")} ${fmt(f.dmgMod)})</span>. HP ${S.hp}/${S.maxHp}.`, "bad");
+    if (F.cfg.tutorial && first("hpTip")) { learn("hp"); await tip("Hit points", `Damage comes off your hit points. You're fine until you hit 0. Watch the HP bar at the top. Consider a heal or the Dodge action if things get dicey.`); }
+    if (S.hp <= 0) {
+      F.deathS = 0; F.deathF = 0; F.stable = false;
+      await narr(`The blow knocks you off your feet. The world goes dark. <b>You are unconscious.</b>`);
+      learn("zero", "conditions");
+      await tip("0 hit points", `At 0 HP you don't die right away. You fall <b>unconscious</b>. On each of your turns you'll roll a <b>death saving throw</b>. Pip can also heal you, and any healing at all brings you back.`);
+    }
+  } else {
+    S.pip.hp = Math.max(0, S.pip.hp - dmg);
+    sys(`Pip takes <b>${dmg}</b> damage. Pip: ${S.pip.hp}/${S.pip.maxHp} HP.`, "bad");
+    if (S.pip.hp <= 0) await narr(`Pip goes down with a yelp, her lute twanging sadly.`);
+  }
+  renderBoard(); await pace(250);
+}
+async function fleeEvent(F, f) {
+  await narr(`${f.name}, badly hurt, shrieks and turns to run for the trees!`);
+  if (S.hp > 0 && !F.reactionUsed) {
+    learn("reaction");
+    await tip("Reaction: opportunity attack", `When an enemy <b>leaves your reach</b>, you can use your <b>reaction</b> to make one melee attack against it. This is an <b>opportunity attack</b>. You get one reaction per round, even on someone else's turn. (Careful monsters take the Disengage action to avoid this.)`);
+    const c = await choose([{ label: "Opportunity attack!", tag: "Reaction", sub: `One swing with your ${C().weapon.name} as it flees.`, value: true, cls: "primary" }, { label: "Let it go", value: false }]);
+    if (c) { F.reactionUsed = true; await playerAttack(F, null, f, { ...C().weapon, ranged: false }); }
+  }
+  if (f.state === "up") { f.state = "fled"; renderBoard(); await narr(`${f.name} crashes into the undergrowth and is gone. You still overcame it, and that counts.`); }
+}
+async function pipTurn(F) {
+  if (S.pip.hp <= 0) { sys("Pip is unconscious."); return; }
+  await pace(350);
+  if (S.hp <= 0 && S.pip.heals > 0) {
+    S.pip.heals--; const h = rnd(4) + 3; S.hp = h; F.deathS = F.deathF = 0; F.stable = false; hud(); renderBoard();
+    await npc("Pip", `"Not on my watch!" She sings a single bright note. <b>Healing Word</b>: you regain ${h} HP and open your eyes.`);
+    if (first("allyHealTip")) await tip("Teamwork saves lives", `Any healing brings a character at 0 HP back to consciousness. This is why parties love a healer, and why you should keep an eye on your friends' HP.`);
+    return;
+  }
+  if (!S.bardic && !F.gaveBardic && S.hp > 0) {
+    F.gaveBardic = true; S.bardic = true; hud();
+    await npc("Pip", `"A song for courage!" Pip strums a fierce chord at you. You gain <b>Bardic Inspiration</b>: once, you can add a d6 to a failed d20 roll.`);
+    if (first("bardTip")) learn("inspiration");
+  }
+  const up = upFoes(F); if (!up.length) return;
+  const t = up.find(f => f.id === F.lastTarget) || up.slice().sort((a, b) => a.dist - b.dist)[0];
+  const moved = F.pipTarget !== t.id; F.pipTarget = t.id; renderBoard();
+  const nat = rnd(20), total = nat + 4, hit = nat === 20 || (nat !== 1 && total >= t.ac);
+  sys(`Pip ${moved ? "darts next to " + t.name + " and stabs" : "stabs at " + t.name} with her dagger: ${chip(nat)} +4 = <b>${total}</b> vs AC ${t.ac} → ${hit ? "HIT" : "MISS"}`);
+  if (S.cls === "rogue" && moved && first("pipSneakTip")) await tip("Ally adjacent", `Pip is now next to ${t.name}. That means your <b>Sneak Attack</b> works against it, even without advantage.`);
+  if (hit) await damageFoe(F, t, rnd(4) + 2 + (nat === 20 ? rnd(4) : 0), "piercing");
+}
+async function deathSave(F) {
+  if (F.stable) { sys("You are unconscious but stable."); return; }
+  if (first("dsTip")) await tip("Death saving throw", `Roll a d20 with no modifiers. <b>10 or higher</b> is a success, below 10 a failure. Three successes: you stabilize. Three failures: you die. A natural 20 brings you back with 1 HP; a natural 1 counts as two failures.`);
+  const r = await roll({ kind: "death", title: "Death saving throw", sub: `Successes ${"●".repeat(F.deathS)}${"○".repeat(3 - F.deathS)} · Failures ${"●".repeat(F.deathF)}${"○".repeat(3 - F.deathF)}`, mods: [], target: 10, player: true });
+  if (r.nat === 20) { S.hp = 1; hud(); badge("brink"); await narr(`Your eyes snap open. You stagger up with 1 hit point!`); return; }
+  if (r.nat === 1) F.deathF += 2; else if (r.success) F.deathS++; else F.deathF++;
+  sys(`Death saves: ${F.deathS} success${F.deathS === 1 ? "" : "es"}, ${F.deathF} failure${F.deathF === 1 ? "" : "s"}.`);
+  if (F.deathS >= 3) { F.stable = true; badge("brink"); await narr(`Your breathing steadies. You're <b>stable</b>: still unconscious, but no longer dying.`); }
+  if (F.deathF >= 3) F.dead = true;
+}
+async function creativeAction(F) {
+  learn("creative");
+  await tip("Try anything", `You aren't limited to the buttons on your sheet. Describe what you want to do, and the DM picks an ability check that fits.`);
+  const boss = F.foes.find(f => f.boss);
+  const v = await choose([
+    { label: "Kick the Great Wheel down the slope at him", tag: `Athletics ${fmt(skillBonus("athletics"))} · DC 12`, value: "athletics" },
+    { label: "Swing on the rope over the pit and kick him", tag: `Acrobatics ${fmt(skillBonus("acrobatics"))} · DC 12`, value: "acrobatics" },
+    { label: "Mock his ridiculous crown until he cries", tag: `Performance ${fmt(skillBonus("performance"))} · DC 12`, value: "performance" }
+  ], { prompt: "What's your plan?" });
+  const r = await skillCheck(v, 12, { sub: "Good DMs reward a fun plan." });
+  if (!r.success) { await narr(v === "athletics" ? `The cheese is heavier than it looks. It rolls two feet and stops. Snaggletooth looks offended.` : v === "acrobatics" ? `You swing out over the pit... and back again, missing completely. Pip applauds anyway.` : `Snaggletooth sniffs. "I've heard worse from my mum."`); return; }
+  badge("creative");
+  if (v === "performance") {
+    await narr(`Your roast is devastating. Snaggletooth's lip trembles. He's so rattled that his next attacks are sloppy.`);
+    boss.atk -= 2; sys("Snaggletooth's attack bonus drops by 2 for the rest of the fight.", "good");
+  } else {
+    await narr(v === "athletics" ? `The Great Wheel thunders down the slope and flattens Snaggletooth like a pancake. The cheese, being enchanted, is fine.` : `You sail across the pit and plant both boots in Snaggletooth's chest.`);
+    const d = await roll({ kind: "damage", title: "Creative damage", sub: "The DM decides the damage. Here: 2d6 bludgeoning.", dice: "2d6", mods: [], player: true });
+    await damageFoe(F, boss, d.total, "bludgeoning");
+  }
+}
+async function parley(F) {
+  const boss = F.foes.find(f => f.boss);
+  const v = await choose([
+    { label: `"Drop the scimitar. It's over."`, tag: `Intimidation ${fmt(skillBonus("intimidation"))} · DC 13`, value: "intimidation" },
+    { label: `"Surrender and we'll let you walk away."`, tag: `Persuasion ${fmt(skillBonus("persuasion"))} · DC 13`, value: "persuasion" }
+  ], { prompt: "Talk him down" });
+  const r = await skillCheck(v, 13, { sub: "Monsters want to live too. A bloodied enemy may give up." });
+  if (r.success) {
+    boss.state = "surrendered";
+    F.foes.forEach(f => { if (f.state === "up") f.state = "fled"; });
+    renderBoard(); badge("diplomat");
+    await npc("Snaggletooth", `"Fine! FINE! Take the stupid cheese. It's not even that good. ...It's very good. Please don't hurt me."`);
+  } else await npc("Snaggletooth", `"Never! The cheese is MINE!"`);
+}
+
+/* =========================================================
+   Character creation
+   ========================================================= */
+function randName() { return NAMES[rnd(NAMES.length) - 1]; }
+function abilityAssigner() {
+  return new Promise(res => {
+    const c = C(); const sc = { ...c.rec }; let sel = null;
+    const box = add("", "widget");
+    const draw = () => {
+      box.innerHTML = `<div class="abil-grid">${ABILS.map(a => `<button class="abil ${sel === a ? "sel" : ""}" data-a="${a}"><span class="ab-name">${ABIL[a]}</span><span class="ab-score">${sc[a]}</span><span class="ab-mod">${fmt(mod(sc[a]))}</span><span class="ab-desc">${ABIL_DESC[a]}</span>${a === c.primary ? `<span class="ab-flag">${c.name} key ability</span>` : ""}</button>`).join("")}</div><p class="hint">${sel ? `Now click another ability to swap it with ${ABIL[sel]}.` : `Scores are pre-arranged for a ${c.name}. Click two abilities to swap them. The big number is the score; the gold number is its modifier.`}</p>`;
+      box.querySelectorAll(".abil").forEach(b => b.onclick = () => {
+        const a = b.dataset.a;
+        if (!sel) sel = a; else if (sel === a) sel = null; else { [sc[sel], sc[a]] = [sc[a], sc[sel]]; sel = null; sfx("click"); }
+        draw();
+      });
+    };
+    draw();
+    choose([{ label: "Lock in these scores", cls: "primary", value: 1 }]).then(() => { box.querySelectorAll("button").forEach(b => b.disabled = true); res(sc); });
+  });
+}
+function nameInput() {
+  return new Promise(res => {
+    const box = add(`<label for="nameField" class="lbl">Your hero's name</label><div class="name-row"><input id="nameField" maxlength="24" autocomplete="off" placeholder="Type a name, or roll one"><button class="btn" id="nameRand" type="button">Random name</button></div>`, "widget");
+    const inp = box.querySelector("input");
+    box.querySelector("#nameRand").onclick = () => { inp.value = randName(); sfx("click"); };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); const b = choicesEl.querySelector("button"); if (b) b.click(); } });
+    choose([{ label: "That's my name", cls: "primary", value: 1 }]).then(() => {
+      const v = inp.value.trim() || randName(); inp.value = v; inp.disabled = true; box.querySelector("#nameRand").disabled = true; res(v);
+    });
+  });
+}
+function finalizeCharacter(sc) {
+  const c = C();
+  S.scores = { ...sc }; S.scores[c.primary] += 2; S.scores.con += 1;
+  const sk = [...c.skills, ...BACKGROUNDS[S.bg].skills];
+  if (S.species === "elf") sk.push("perception");
+  if (S.species === "human") sk.push(["persuasion", "insight", "perception", "athletics"].find(x => !sk.includes(x)));
+  S.skills = [...new Set(sk)];
+  S.maxHp = c.hd + abilMod("con") + (S.species === "dwarf" ? 1 : 0); S.hp = S.maxHp;
+  S.ac = c.ac(S.scores);
+  S.maxSlots = c.slots || 0; S.slots = S.maxSlots;
+  S.secondWind = S.cls === "fighter" ? 2 : 0;
+  S.inspiration = S.species === "human";
+  S.gold = 10; S.hitDice = 1;
+}
+
+/* =========================================================
+   Chapters
+   ========================================================= */
+const TOTAL_CH = 7;
+async function quiz(q, opts, correct, explain) {
+  S.quiz.total++;
+  add(`Pop quiz: ${q}`, "quizq");
+  const v = await choose(opts.map((t, i) => ({ label: t, value: i })), { prompt: "Twenty's pop quiz" });
+  if (v === correct) { S.quiz.right++; sfx("good"); sys(`<b>Correct!</b> ${explain}`, "good"); }
+  else { sfx("bad"); sys(`<b>Not quite.</b> The answer is “${opts[correct]}”. ${explain}`, "bad"); }
+  await pace(300);
+}
+
+async function chTable() {
+  scene(`Chapter 1 of ${TOTAL_CH}`, "The Table");
+  await narr(`Somewhere, a group of friends sits around a kitchen table covered in snacks, pencils, and oddly shaped dice. One of them sits behind a folding cardboard screen, grinning.`);
+  await narr(`That's how every game of Dungeons & Dragons begins.`);
+  await tip("Hello!", `<p>I'm <b>Twenty</b>, a twenty-sided die and your guide. By the end of this adventure you'll have built a character, talked your way through a tavern, dodged a trap, fought goblins, and leveled up.</p><p>Everything here follows the real 5th Edition rules, so it will all carry over to your first game.</p>`);
+  await cont("Let's go");
+  await tip("What is D&D?", `<p>D&D is a game of <b>shared storytelling</b>. One player is the <b>Dungeon Master (DM)</b>: they describe the world, play every monster and villager, and referee the rules. Everyone else plays a single <b>character</b>, a hero they control.</p><p>There's no board and no winner. Everyone wins when the story is great.</p>`);
+  learn("roles");
+  await tip("The core loop", `<p>Nearly everything in D&D follows three steps:</p><div class="loop"><div><b>1. Describe</b>The DM sets the scene.</div><div><b>2. Declare</b>You say what your character does.</div><div><b>3. Resolve</b>If the outcome is uncertain, roll dice. The DM narrates what happens.</div></div>`);
+  learn("core");
+  await cont("Try it");
+  await npc("The DM", `"You stand in a damp stone corridor. Ahead is a heavy oak door with an iron ring for a handle. What do you do?"`);
+  const v = await choose([
+    { label: `"I open the door."`, value: "open" },
+    { label: `"I press my ear to the door and listen."`, value: "listen" },
+    { label: `"I knock three times and shout: Room service!"`, value: "knock" }
+  ], { prompt: "Tell the DM what your character does" });
+  if (v === "open") {
+    you(`"I open the door."`);
+    await npc("The DM", `"It creaks open. Beyond is a dusty storeroom full of turnips."`);
+    await tip("No roll needed", `You didn't roll anything. Opening an unlocked door can't really fail, so the DM just tells you what happens. <b>Dice only come out when the outcome is uncertain</b> and failure would be interesting.`);
+  } else if (v === "listen") {
+    you(`"I press my ear to the door and listen."`);
+    await npc("The DM", `"Hearing something faint is uncertain. Give me a Wisdom (Perception) check."`);
+    await tip("Step 3: resolve", `That's the third step of the loop. The DM asked for a roll because you might or might not hear something. You'll learn exactly how that roll works in a moment. For now: you hear loud snoring. Something big is asleep in there.`);
+  } else {
+    you(`"I knock three times and shout: Room service!"`);
+    await npc("The DM", `(laughing) "From inside, a sleepy, enormous voice grumbles: 'Leave it by the door.'"`);
+    await tip("Be creative", `Yes, you're allowed to be silly. Anything your character could try, you can say. The DM decides how the world reacts. Some of the best moments in D&D come from ideas nobody planned for.`);
+  }
+  await cont();
+  await tip("Meet your dice", `A standard set has seven dice. <b>Click each one to roll it.</b> The number after the "d" is how many sides it has.`);
+  await diceShowcase();
+  learn("dice");
+  await tip("Dice notation", `You'll see things like <code>2d6 + 3</code>. Read it as: <b>roll two six-sided dice, add them together, then add 3</b>. The number before the "d" is how many dice; the number after is how many sides.`);
+  await quiz("What does 3d8 + 2 mean?", ["Roll one d8, multiply by 3, add 2", "Roll three d8s, add them, then add 2", "Roll a d3 and a d8, then add 2"], 1, "Three eight-sided dice, added together, plus 2.");
+  await quiz("Who decides whether you need to roll?", ["You do", "The DM", "Whoever has the most dice"], 1, "You describe what you try. The DM decides if it needs a roll, and which one.");
+  await cont("On to character creation");
+}
+function diceShowcase() {
+  return new Promise(res => {
+    const info = {
+      4: "<b>d4</b>: small damage, like a dagger or each dart of Magic Missile. Shaped like a caltrop. Do not step on it barefoot.",
+      6: "<b>d6</b>: shortswords, Sneak Attack, and the famous Fireball spell (8d6!).",
+      8: "<b>d8</b>: longswords, rapiers, and healing spells.",
+      10: "<b>d10</b>: heavy weapons, the Fire Bolt cantrip, and a fighter's Hit Die.",
+      12: "<b>d12</b>: the greataxe. Barbarians love it. It doesn't get rolled much and is a little sad about that.",
+      20: "<b>d20</b>: the star of the show. You roll it whenever you <i>attempt</i> something risky: ability checks, attack rolls, and saving throws. High is good.",
+      100: "<b>d100</b>: two d10s, one for the tens and one for the ones. Used for random tables, like a wild magic surge."
+    };
+    const sides = [4, 6, 8, 10, 12, 20, 100]; const done = new Set();
+    const box = add(`<div class="dice-row">${sides.map(s => `<button class="die-btn" data-s="${s}" aria-label="Roll a d${s}">${dieSVG(s, s === 100 ? "%" : s)}<span class="dname">d${s}</span></button>`).join("")}</div><div class="die-info" id="dieInfo">Click a die.</div>`, "widget");
+    let resolved = false;
+    const finishBtn = () => choose([{ label: done.size < sides.length ? `Roll all seven to continue (${done.size}/7)` : "I know my dice", cls: "primary", value: 1, disabled: done.size < sides.length }]).then(() => { resolved = true; box.querySelectorAll("button").forEach(b => b.disabled = true); res(); });
+    box.querySelectorAll(".die-btn").forEach(b => b.onclick = async () => {
+      if (resolved || b.dataset.busy) return;
+      b.dataset.busy = 1;
+      const s = +b.dataset.s; const svg = b.querySelector(".die"); svg.dataset.s = s;
+      const v = s === 100 ? rnd(100) : rnd(s);
+      await animateDice([svg], [v]);
+      delete b.dataset.busy;
+      if (resolved) return;
+      if (s === 20 && v === 20) badge("nat20");
+      box.querySelector("#dieInfo").innerHTML = `You rolled <b>${v}</b>${s === 100 ? "%" : ""}. ${info[s]}`;
+      done.add(s); b.classList.add("done");
+      finishBtn();
+    });
+    finishBtn();
+  });
+}
+
+async function chCreate() {
+  scene(`Chapter 2 of ${TOTAL_CH}`, "Who Are You?");
+  await tip("Making a character", `<p>Every player brings a character, written on a <b>character sheet</b>. You'll make four choices:</p><p><b>Species</b> (what you are), <b>class</b> (what you do), <b>background</b> (who you were), and <b>ability scores</b> (what you're good at).</p>`);
+  learn("species");
+  const sp = await choose(Object.entries(SPECIES).map(([k, s]) => ({ label: s.name, sub: s.blurb + " " + s.traits.map(t => t.replace(/<[^>]+>/g, "")).join(" "), value: k })), { prompt: "Step 1 · Choose your species" });
+  S.species = sp; you(`I'm a${/^[aeiou]/i.test(SPECIES[sp].name) ? "n" : ""} ${SPECIES[sp].name}.`);
+  await tip("Class matters most", `Your <b>class</b> decides how you play: what you do in a fight and how you solve problems. Any combination works. There are no wrong answers here.`);
+  const cl = await choose(Object.entries(CLASSES).map(([k, c]) => ({ label: c.name, tag: c.role, sub: c.blurb + ` d${c.hd} Hit Die.`, value: k })), { prompt: "Step 2 · Choose your class" });
+  S.cls = cl; you(`And a ${C().name}.`);
+  const bg = await choose(Object.entries(BACKGROUNDS).map(([k, b]) => ({ label: b.name, sub: `${b.blurb} Skills: ${b.skills.map(s => SKILL_NAME[s]).join(", ")}.`, value: k })), { prompt: "Step 3 · Choose your background" });
+  S.bg = bg; you(`Before adventuring, I was a ${BACKGROUNDS[bg].name.toLowerCase()}.`);
+  await tip("The six abilities", `<p>Every creature has six <b>ability scores</b>. Most heroes range from 8 (weak) to about 17 (excellent) at level 1.</p><p>The number you'll actually use is the <b>modifier</b>: (score − 10) ÷ 2, rounded down. A 15 becomes +2, a 12 becomes +1, an 8 becomes −1. That modifier gets added to your d20 rolls.</p>`);
+  learn("abilities", "modifier", "standard");
+  const sc = await abilityAssigner();
+  finalizeCharacter(sc);
+  await tip("Ability bonus", `Finally you add <b>+2</b> to one score and <b>+1</b> to another. I've put +2 on your ${ABIL[C().primary]} and +1 on Constitution. (In the 2024 rules your background gives this bonus; in 2014 your species does.) Your ${ABIL[C().primary]} is now ${S.scores[C().primary]}, a modifier of ${fmt(abilMod(C().primary))}.`);
+  const nm = await nameInput();
+  S.name = nm; hud();
+  await narr(`<b>${esc(S.name)}</b>, ${SPECIES[S.species].name.toLowerCase()} ${C().name.toLowerCase()}, steps onto the road.`);
+  learn("prof", "hp", "ac");
+  add(`<div class="sheet-card">
+    <div><small>Hit Points</small><b>${S.maxHp}</b><span>d${C().hd} max (${C().hd}) + CON ${fmt(abilMod("con"))}${S.species === "dwarf" ? " + 1 dwarf" : ""}</span></div>
+    <div><small>Armor Class</small><b>${S.ac}</b><span>${C().acNote}</span></div>
+    <div><small>Proficiency</small><b>+2</b><span>For anything you're trained in</span></div>
+    <div><small>Skills</small><b>${S.skills.length}</b><span>${S.skills.map(s => SKILL_NAME[s]).join(", ")}</span></div>
+  </div>`, "widget");
+  await tip("Your character sheet", `<p><b>Hit Points (HP)</b> are how much damage you can take. <b>Armor Class (AC)</b> is how hard you are to hit. Your <b>proficiency bonus</b> (+2 at level 1) gets added to anything you're trained in, like your skills, weapons, and spells.</p><p>Your full sheet is always one click away: the <b>Sheet</b> button at the top. Real players glance at theirs constantly.</p>`);
+  await quiz("Your Strength score is 16. What's your Strength modifier?", ["+16", "+6", "+3", "+1"], 2, "(16 − 10) ÷ 2 = 3. You add +3, not 16.");
+  await quiz("What does Armor Class (AC) measure?", ["How hard you are to hit", "How much damage you can take", "How fast you move"], 0, "Attackers need to meet or beat your AC to hit you. Hit points measure how much damage you can take.");
+  await cont("Enter the tavern");
+}
+
+async function chTavern() {
+  scene(`Chapter 3 of ${TOTAL_CH}`, "The Wobbly Wyvern");
+  await narr(`Rain hammers the shutters of the Wobbly Wyvern, the only inn in the village of Brindlewood. Inside it smells of woodsmoke, wet dog, and an unusual amount of worry.`);
+  await narr(`A halfling in a feathered cap waves you over, nearly knocking over her own drink.`);
+  await npc("Pip", `"You look like an adventurer! Excellent. I'm Pip, a bard. I sing, I stab, I heal a little. Mostly I sing. Mind if I join your party?"`);
+  await tip("Your party", `Characters adventure together in a <b>party</b>, usually 3 to 6 heroes, each played by a different person. Pip stands in for your friends at a real table. She'll fight beside you and patch you up when things go wrong.`);
+  await cont("Welcome aboard, Pip");
+  await narr(`Behind the bar, the innkeeper Mirna Thistlewood polishes a mug so hard it squeaks.`);
+  await npc("Mirna", `"Three nights ago, goblins broke into the cellar under the town hall. They took the <b>Great Wheel of Brindlewood</b>, a two-hundred-year-old enchanted cheese. The Harvest Festival is in two days. No cheese, no festival. The mayor is offering 50 gold to whoever brings it back."`);
+  const v = await choose([
+    { label: `"We'll do it."`, value: "accept" },
+    { label: `"Two hundred years old? Is it still... edible?"`, value: "cheese" },
+    { label: `"50 gold to fight goblins? Let's talk about that number."`, value: "haggle" }
+  ], { prompt: "Respond in character" });
+  if (v === "cheese") { you(`"Two hundred years old? Is it still... edible?"`); await npc("Mirna", `"It's <i>enchanted</i>. It gets better every year. People travel for days to taste one slice."`); }
+  else if (v === "accept") { you(`"We'll do it."`); await npc("Mirna", `"Bless you. Though between us, you could probably squeeze a bit more out of the mayor..."`); }
+  else you(`"50 gold to fight goblins? Let's talk about that number."`);
+  await tip("Talking is a skill", `<p>You can say anything you like, in your own words. When the outcome of a conversation is uncertain, the DM asks for an <b>ability check</b>, usually Charisma or Wisdom.</p><p>Here's the formula you'll use for the rest of your D&D life:</p><div class="anatomy">d20 + ability modifier + proficiency bonus (if trained) ≥ DC</div><p>The <b>DC</b> (Difficulty Class) is the target number the DM picks:</p><div class="ladder"><span><b>5</b>very easy</span><span><b>10</b>easy</span><span><b>15</b>medium</span><span><b>20</b>hard</span><span><b>25</b>very hard</span><span><b>30</b>nearly impossible</span></div>`);
+  learn("check", "skills");
+  await tip("A secret", `Most DMs keep the DC hidden. I'll show it to you while you're learning.`);
+  const box = add(`<label for="sayField" class="lbl">Optional: type what your character says to Mirna</label><div class="name-row"><input id="sayField" maxlength="140" autocomplete="off" placeholder="“Surely the town's pride is worth more than 50 gold?”"></div>`, "widget");
+  const approach = await choose([
+    { label: "Appeal to her kindness and the town's pride", tag: `Persuasion ${fmt(skillBonus("persuasion"))} · DC 12`, value: "persuasion" },
+    { label: "Lean on the bar and loom menacingly", tag: `Intimidation ${fmt(skillBonus("intimidation"))} · DC 15`, value: "intimidation" },
+    { label: "Study her face. Is she hiding something?", tag: `Insight ${fmt(skillBonus("insight"))} · DC 10`, value: "insight" }
+  ], { prompt: "Choose your approach" });
+  const said = box.querySelector("input").value.trim(); box.querySelector("input").disabled = true;
+  if (said) { you(`“${esc(said)}”`); await tip("Nice roleplay", `Saying it in character is half the fun. A good line can convince a DM to lower the DC or give you advantage.`); }
+  const dc = { persuasion: 12, intimidation: 15, insight: 10 }[approach];
+  const r = await skillCheck(approach, dc);
+  if (approach === "persuasion") {
+    if (r.success) { S.flags.reward = 75; badge("silver"); await npc("Mirna", `"...You're right. It's the heart of this village. I'll make sure the mayor pays <b>75 gold</b>. Don't tell him I said so."`); }
+    else await npc("Mirna", `"I'm sorry, love. 50 is all the mayor has. Times are hard."`);
+  } else if (approach === "intimidation") {
+    if (r.success) { S.flags.reward = 65; badge("silver"); await npc("Mirna", `She swallows. "...Sixty-five. Sixty-five gold. Please stop looming."`); }
+    else await npc("Mirna", `She laughs right in your face. "I've thrown bigger orcs than you out of this inn, sweetheart."`);
+  } else {
+    if (r.success) { S.flags.map = 1; badge("silver"); await narr(`Mirna's eyes keep flicking to the window. She knows something.`); await npc("Mirna", `"...All right. My nephew saw them heading for the old mine on Crookback Hill. He drew this map. Please, don't tell my sister he was out that late."`); }
+    else await narr(`Mirna seems honest. Mostly. You can't tell.`);
+  }
+  if (!r.success) { learn("failforward"); await tip("Failing forward", `You failed, and the story keeps moving. You still get the quest; you just didn't get the bonus. In D&D, failure usually means a <b>complication</b>, not a dead end.`); }
+  await npc("Mirna", `"Here. Take this, for the road." She slides a small red bottle across the bar. <b>Potion of Healing</b>: drink it to regain 2d4 + 2 hit points.`);
+  S.potions++; hud();
+  await narr(`Across the room, a white-bearded dwarf slams her elbow down on a table. "Old Brunhild's undefeated! Anyone want to arm-wrestle for a round of drinks?"`);
+  const aw = await choose([
+    { label: "Arm-wrestle Old Brunhild", tag: `Athletics ${fmt(skillBonus("athletics"))} contest`, value: true },
+    { label: "Politely decline", value: false }
+  ]);
+  if (aw) {
+    learn("contest");
+    await tip("Contests", `When two people directly oppose each other, you both roll, and the <b>higher total wins</b>. Brunhild has Athletics +5. Ties mean nobody budges, so you go again.`);
+    let won = null;
+    while (won === null) {
+      const her = rnd(20) + 5;
+      sys(`Old Brunhild rolls Athletics: <b>${her}</b>`);
+      const rr = await roll({ kind: "contest", title: "Athletics contest", sub: `Beat Brunhild's ${her}.`, mods: [{ label: "STR", val: abilMod("str"), show: true }].concat(isProf("athletics") ? [{ label: "Proficiency", val: PB }] : []), target: her, targetLabel: "Brunhild's", player: true });
+      if (rr.success === "tie") { await narr(`Your arms tremble, locked in place. Neither of you budges an inch. Again!`); continue; }
+      won = rr.success;
+    }
+    if (won) { badge("arm"); S.gold += 5; await npc("Old Brunhild", `Her knuckles hit the table. The tavern explodes with cheers. "Ha! Haven't lost since the Dragon War. Here's five gold. Earned it."`); }
+    else await npc("Old Brunhild", `She slams your hand down and roars with laughter. "Good effort, twig. Next round's on me anyway."`);
+  }
+  hud();
+  await quiz("You're proficient in Persuasion and have Charisma 14. What do you add to the d20?", ["+2 (CHA only)", "+4 (CHA +2 and proficiency +2)", "+14"], 1, "Ability modifier (+2) plus proficiency bonus (+2), because you're trained in Persuasion.");
+  await cont("Set out for Crookback Hill");
+}
+
+async function chWoods() {
+  scene(`Chapter 4 of ${TOTAL_CH}`, "The Whispering Wood");
+  await narr(`The road to Crookback Hill winds into an old forest. Moss hangs from the branches like wet laundry.${S.flags.map ? " Mirna's map points you down a deer trail." : ""}`);
+  await npc("Pip", `"Look! Footprints. Small, bare, and very smelly. Goblins. Can you follow them?"`);
+  await tip("Advantage", `<p>Pip offers to help. The <b>Help</b> action gives you <b>advantage</b>: roll <b>two d20s and keep the higher one</b>. It's one of the most important rules in the game.</p><p>The opposite, <b>disadvantage</b>, means rolling two and keeping the lower.</p>`);
+  learn("adv", "help");
+  const h = await choose([
+    { label: "Accept Pip's help", tag: `Survival ${fmt(skillBonus("survival"))} · advantage`, value: 1 },
+    { label: "Do it yourself", tag: `Survival ${fmt(skillBonus("survival"))} · normal roll`, value: 0 }
+  ]);
+  const r = await skillCheck("survival", 12, { adv: h ? 1 : 0, sub: h ? "Two d20s, keep the higher." : "" });
+  if (r.success) await narr(`You follow the trail easily: broken twigs, a dropped chicken bone, a goblin-sized sock. By late afternoon you're close.`);
+  else { await narr(`You lose the trail twice and spend hours doubling back. By the time you find it again, the sun is setting.`); learn("failforward"); }
+  await narr(`Night falls. The forest goes black.`);
+  learn("vision", "passive");
+  const darkvision = S.species === "elf" || S.species === "dwarf";
+  let adv = 0;
+  if (darkvision) {
+    await tip("Darkvision", `As a${S.species === "elf" ? "n elf" : " dwarf"}, you have <b>darkvision</b>: you see in darkness as if it were dim light. Humans and halflings would need a torch here or suffer <b>disadvantage</b> on checks to spot things. Your species just paid off.`);
+  } else {
+    await tip("Darkness", `Humans and halflings can't see in the dark. Searching for danger by sight in darkness would give you <b>disadvantage</b>. Lighting a torch fixes that, but anything out there will see you coming.`);
+    const t = await choose([
+      { label: "Light a torch", sub: "Normal roll. Very visible.", value: "torch" },
+      { label: "Stay in the dark", sub: "Disadvantage on Perception. Hidden.", value: "dark" }
+    ]);
+    S.flags.torch = t === "torch"; if (t === "dark") adv = -1;
+  }
+  await tip("Passive Perception", `Your <b>passive Perception</b> is ${passivePerception()} (10 + your Perception bonus). Some DMs secretly compare it to hidden things so you don't know something's there. This DM wants you to roll.`);
+  const p = await skillCheck("perception", 13, { adv, sub: "Is there anything dangerous on the path ahead?" });
+  if (p.success) {
+    badge("trap");
+    await narr(`You freeze. Stretched across the path at ankle height is a thin <b>tripwire</b>, connected to a log hanging in the branches above.`);
+    const d = await choose([
+      { label: "Step carefully over it", sub: "Sensible plans often need no roll at all.", value: "step" },
+      { label: "Try to disarm it", tag: `Sleight of Hand ${fmt(skillBonus("sleightOfHand"))} · DC 12`, value: "disarm" }
+    ]);
+    if (d === "step") { await narr(`You and Pip step over the wire, slow and careful. Nothing happens.`); await tip("No roll needed", `Stepping over a trap you've already spotted carries no real risk, so the DM doesn't ask for a roll.`); }
+    else {
+      const s = await skillCheck("sleightOfHand", 12);
+      if (s.success) await narr(`You loosen the knot, and the log settles harmlessly to the ground. Pip gives you a silent thumbs up.`);
+      else { await narr(`Snap. Wrong knot. The log swings down at you!`); await trapSave(); }
+    }
+  } else {
+    await narr(`Your foot catches on something. <i>Twang.</i> A log swings out of the darkness straight at you!`);
+    await trapSave();
+  }
+  await quiz("You have advantage on a roll. You roll a 4 and a 17. What's your d20 result?", ["4", "17", "21"], 1, "With advantage you keep the higher die. With disadvantage you'd keep the 4.");
+  await cont("Keep going");
+}
+async function trapSave() {
+  learn("save");
+  await tip("Saving throw!", `This isn't something you're <i>trying</i> to do. It's happening <i>to</i> you. That calls for a <b>saving throw</b>: d20 + ability modifier, plus proficiency if your class is proficient in that save. A ${C().name} is proficient in ${C().saves.map(a => ABIL[a]).join(" and ")} saves.`);
+  const r = await savingThrow("dex", 12, { sub: "Dodge the swinging log!" });
+  if (r.success) await narr(`You throw yourself flat. The log whooshes over your head.`);
+  else {
+    const d = await roll({ kind: "damage", title: "Log trap damage", sub: "1d6 bludgeoning.", dice: "1d6", mods: [] });
+    damagePlayer(d.total); await narr(`The log slams into your chest. You take ${d.total} damage (HP ${S.hp}/${S.maxHp}).`);
+    if (S.hp <= 0) { S.hp = 1; hud(); await npc("Pip", `"Easy, easy. You're okay." Pip props you up. (You're at 1 HP. Twenty is being merciful.)`); }
+  }
+}
+
+async function chAmbush() {
+  scene(`Chapter 5 of ${TOTAL_CH}`, "Ambush!");
+  await narr(`${S.flags.torch ? "Your torchlight catches yellow eyes in the trees." : "The trap's noise echoes through the trees."} A cackle splits the night. Two goblins burst from the undergrowth: one waving a rusty scimitar, the other already nocking an arrow from a branch 60 feet away.`);
+  await npc("Goblin", `"Shiny things! Give us the shiny things!"`);
+  await combat({
+    tutorial: true, flee: true,
+    enemies: [
+      { name: "Goblin", weapon: "scimitar", ac: 15, hp: 7, atk: 4, dmg: "1d6", dmgMod: 2, dmgType: "slashing", dist: 30, speed: 30, dexMod: 2, xp: 50 },
+      { name: "Goblin Archer", weapon: "shortbow", ac: 15, hp: 7, atk: 4, dmg: "1d6", dmgMod: 2, dmgType: "piercing", dist: 60, speed: 30, dexMod: 2, xp: 50, ranged: true }
+    ]
+  });
+  badge("goblin");
+  await gainXP(100, "two goblins overcome");
+  S.gold += 6; hud();
+  await narr(`You find 6 gold pieces and a half-eaten turnip in the goblins' pouches. Pip keeps the turnip.`);
+  await shortRest();
+  await quiz("You attack a goblin (AC 15). You roll 11 on the d20 and your attack bonus is +5. Do you hit?", ["Yes: 16 beats 15", "No: 11 is below 15", "Only on a natural 20"], 0, "Add your bonus to the d20: 11 + 5 = 16, which meets or beats AC 15.");
+  await quiz("On your turn, how many actions do you normally get?", ["As many as you want", "One action, plus movement and maybe a bonus action", "Two actions"], 1, "Move, one action, and a bonus action only if something gives you one.");
+  await cont("Climb to the cave");
+}
+async function shortRest() {
+  learn("rest");
+  await tip("Short rest", `<p>After a fight, you can take a <b>short rest</b>: an hour of bandages and snacks. You can spend <b>Hit Dice</b> to heal: roll your class's Hit Die (d${C().hd}) and add your Constitution modifier. At level 1 you have one.</p><p>A <b>long rest</b> (8 hours of sleep) restores everything.</p>`);
+  if (S.hp < S.maxHp && S.hitDice > 0) {
+    const v = await choose([{ label: "Spend your Hit Die", tag: `d${C().hd} ${fmt(abilMod("con"))}`, sub: `You're at ${S.hp}/${S.maxHp} HP.`, value: 1, cls: "primary" }, { label: "Save it", value: 0 }]);
+    if (v) { S.hitDice--; const r = await roll({ kind: "heal", title: "Spend a Hit Die", dice: `1d${C().hd}`, mods: [{ label: "CON", val: abilMod("con") }], player: true }); healPlayer(Math.max(1, r.total)); await narr(`You regain ${Math.max(1, r.total)} HP (now ${S.hp}/${S.maxHp}).`); }
+  } else await narr(`You're in good shape, so you save your Hit Die for later.`);
+  if (S.cls === "wizard" && S.slots < S.maxSlots) { S.slots++; await narr(`You study your spellbook by the fire. <b>Arcane Recovery</b> restores one spell slot.`); }
+  if (S.cls === "fighter" && S.secondWind < 2) { S.secondWind++; await narr(`You catch your breath. One use of <b>Second Wind</b> returns.`); }
+  S.pip.hp = S.pip.maxHp; S.pip.heals = Math.max(S.pip.heals, 1);
+  await narr(`Pip hums while bandaging her own scrapes. She's back to full health.`);
+  hud();
+}
+
+async function chCave() {
+  scene(`Chapter 6 of ${TOTAL_CH}`, "Crookback Mine");
+  await narr(`The old mine yawns open in the hillside. Firelight flickers somewhere deep inside, and you can smell it from here: cheese. Glorious, ancient cheese.`);
+  await narr(`At the entrance, a skinny goblin sentry sits on a barrel, snoring, a spear across his knees.`);
+  await tip("More than one way", `Combat is only one tool. You could sneak past, talk, trick, or fight. Each one is a real option, and each one earns XP if it works.`);
+  learn("creative");
+  const v = await choose([
+    { label: "Sneak past him", tag: `Stealth ${fmt(skillBonus("stealth"))} · group check · DC 12`, value: "sneak" },
+    { label: "Wake him up and talk", tag: `Persuasion ${fmt(skillBonus("persuasion"))} · DC 12`, value: "talk" },
+    { label: "Attack while he sleeps", tag: "Combat", value: "fight" }
+  ], { prompt: "How do you get past the sentry?" });
+  let fight = v === "fight";
+  if (v === "sneak") {
+    await tip("Group check", `When the whole party tries something together, everyone rolls. If <b>at least half</b> succeed, the group succeeds. The skilled can carry the clumsy.`);
+    const pip = rnd(20) + 3; sys(`Pip rolls Stealth: <b>${pip}</b> → ${pip >= 12 ? '<span class="good">success</span>' : '<span class="bad">failure</span>'}`);
+    const r = await skillCheck("stealth", 12);
+    if (r.success || pip >= 12) await narr(`${r.success && pip >= 12 ? "You both" : r.success ? "Pip trips over a pebble, but you catch her before she clatters. You" : "You step on a twig, but Pip yanks you into the shadows. You"} slip past the snoring sentry and into the tunnel.`);
+    else { await narr(`Pip kicks a bucket. You step on a cat. The sentry jolts awake. "INTRUDERS!"`); fight = true; }
+  } else if (v === "talk") {
+    await narr(`You nudge him awake. He yelps and points the spear at you, shaking.`);
+    const r = await skillCheck("persuasion", 12, { sub: "Convince him that helping you is a good idea." });
+    if (r.success) {
+      S.flags.weak = 1;
+      await npc("Nib the goblin", `"You... you won't hurt me? Boss Snaggletooth won't even let us <i>smell</i> the cheese. Listen: he guards his left side badly. Old arrow wound. I'm leaving. I'm going to be a baker."`);
+      await tip("Information is power", `Talking got you a secret: your first attack against Snaggletooth will have <b>advantage</b>. Social skills can win fights before they start.`);
+    } else { await npc("Nib the goblin", `"Nice try! BOSS! INTRUDERS!"`); fight = true; }
+  }
+  if (fight) {
+    await combat({ enemies: [{ name: "Nib", weapon: "spear", ac: 13, hp: 5, atk: 4, dmg: "1d6", dmgMod: 2, dmgType: "piercing", dist: 10, speed: 30, dexMod: 2, xp: 50 }] });
+  }
+  await gainXP(50, v === "fight" || fight ? "sentry defeated" : v === "sneak" ? "sentry avoided" : "sentry talked down");
+  await narr(`Deeper in, the tunnel ends at a round stone door covered in goblin scribbles. Above the handle, words are carved in crooked letters:`);
+  await riddle();
+  await narr(`Beyond the door, a short tunnel slopes up toward firelight. You hear a loud, nasal voice: "MINE! All MINE!"`);
+  await npc("Pip", `"That'll be the boss. Ready?"`);
+  const rest = await choose([{ label: "Check your gear first", sub: "Open your character sheet.", value: "sheet" }, { label: "Ready", value: "go", cls: "primary" }]);
+  if (rest === "sheet") { renderSheet(); openDrawer("#sheetDrawer"); await tip("Know your sheet", `Before a big fight, check your HP, your spell slots, and anything you haven't used yet, like a potion. Players who know their sheets keep the game moving.`); await cont("Ready"); }
+}
+async function riddle() {
+  await npc("The door", `"The more you take, the more you leave behind. What am I?"`);
+  await tip("Player skill vs. character skill", `Some puzzles are for <i>you</i> to solve, not your character. If you're stuck, many DMs let you roll Intelligence for a hint, since your character might be smarter than you are at 1 a.m.`);
+  const box = add(`<label for="riddleField" class="lbl">Your answer</label><div class="name-row"><input id="riddleField" maxlength="40" autocomplete="off" placeholder="Speak the answer..."></div>`, "widget");
+  const inp = box.querySelector("input");
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); const b = choicesEl.querySelector("button"); if (b) b.click(); } });
+  let tries = 0, hinted = false;
+  while (true) {
+    const v = await choose([
+      { label: "Speak the answer", value: "ans", cls: "primary" },
+      { label: "Search for a clue", tag: `Investigation ${fmt(skillBonus("investigation"))} · DC 10`, value: "hint", disabled: hinted },
+      { label: "Ask Pip", value: "pip" }
+    ]);
+    if (v === "hint") {
+      hinted = true; const r = await skillCheck("investigation", 10, { sub: "Look for clues around the door." });
+      if (r.success) await narr(`The floor in front of the door is covered in muddy prints going back and forth, back and forth. Somebody has stood here guessing a <i>lot</i>.`);
+      else await narr(`You find a goblin doodle of a cheese with a crown on it. Not helpful. Kind of cute.`);
+      continue;
+    }
+    if (v === "pip") { await npc("Pip", `"Is it... cheese? It's always cheese." The door does not open.`); tries++; }
+    else {
+      const a = inp.value.trim().toLowerCase();
+      if (/foot ?steps?|foot ?prints?|^steps?$|tracks/.test(a)) {
+        inp.disabled = true; badge("riddle"); sfx("good");
+        await narr(`"${esc(inp.value.trim())}," you say. The door grinds open with a sound like a disappointed sigh.`);
+        await tip("Well done", `Clever players are rewarded too. That one was all you, not your dice.`);
+        return;
+      }
+      tries++; you(a ? `“${esc(inp.value.trim())}”` : "(mumbles)"); await narr(`Nothing happens.`);
+      inp.value = "";
+    }
+    if (tries >= 3) {
+      inp.disabled = true;
+      await narr(`After your third guess the door clicks and swings open anyway. Of course: goblins can never remember the answer either, so they rigged it to open on the third try.`);
+      await tip("The answer", `It was <b>footsteps</b>. Good DMs don't let a puzzle stall the whole game. There's usually another way through.`);
+      return;
+    }
+  }
+}
+
+async function chBoss() {
+  scene(`Chapter 7 of ${TOTAL_CH}`, "The Cheese Throne");
+  await narr(`The tunnel opens into a cavern lit by a crackling fire. On a ledge sits the <b>Great Wheel of Brindlewood</b>, golden and enormous. Sprawled on top of it like a throne is a goblin in a dented crown: <b>Boss Snaggletooth</b>.`);
+  await npc("Snaggletooth", `"Who dares disturb my snack? Grub! Get them!"`);
+  await narr(`A burly goblin named Grub grunts and draws a scimitar.`);
+  await tip("Boss fight", `<p>This fight uses everything you've learned. A few new things to watch for:</p><p><b>Multiattack:</b> Snaggletooth attacks twice per turn (the second with disadvantage). <b>Monster reactions:</b> he has a dirty trick. <b>Creativity:</b> look for an unusual action. <b>Talking:</b> once he's bloodied, he might surrender.</p>`);
+  await combat({
+    creative: true, parley: true,
+    enemies: [
+      { name: "Snaggletooth", weapon: "scimitar", ac: 15, hp: 21, atk: 4, dmg: "1d6", dmgMod: 2, dmgType: "slashing", dist: 40, speed: 30, dexMod: 2, xp: 200, boss: true, multi: 2, redirect: true, weakSide: !!S.flags.weak },
+      { name: "Grub", weapon: "scimitar", ac: 15, hp: 7, atk: 4, dmg: "1d6", dmgMod: 2, dmgType: "slashing", dist: 25, speed: 30, dexMod: 2, xp: 50 }
+    ]
+  });
+  await gainXP(250, "Snaggletooth and Grub overcome");
+  badge("hero");
+  await narr(`You roll the Great Wheel out of the mine together. It's surprisingly cooperative, for a cheese. Under Snaggletooth's throne you find a pouch of <b>30 gold</b> and another <b>Potion of Healing</b>.`);
+  S.gold += 30; S.potions++; hud();
+  await cont("Return to Brindlewood");
+}
+
+async function chEnd() {
+  scene("Epilogue", "Level Up!");
+  await narr(`Brindlewood's Harvest Festival goes ahead. Lanterns hang from every roof. The mayor pays you ${S.flags.reward || 50} gold, Mirna won't let you pay for a drink ever again, and Old Brunhild insists on a rematch.`);
+  S.gold += (S.flags.reward || 50); hud();
+  await narr(`The first slice of the Great Wheel is ceremonially given to you. It tastes like sunshine and victory.`);
+  await tip("You have " + S.xp + " XP", `That's past 300, which means you reach <b>level 2</b>! Leveling up is one of the best feelings in D&D.`);
+  sfx("level");
+  const c = C();
+  const avg = c.hd / 2 + 1;
+  const v = await choose([
+    { label: `Roll your Hit Die`, tag: `d${c.hd} ${fmt(abilMod("con"))}`, sub: "Risky. Could be great, could be a 1.", value: "roll" },
+    { label: `Take the average`, tag: `${avg} ${fmt(abilMod("con"))}`, sub: "The safe choice most players make.", value: "avg" }
+  ], { prompt: "Increase your maximum HP" });
+  let gain;
+  if (v === "roll") { const r = await roll({ kind: "heal", title: "Level-up HP", dice: `1d${c.hd}`, mods: [{ label: "CON", val: abilMod("con") }], player: true }); gain = r.total; }
+  else gain = avg + abilMod("con");
+  if (S.species === "dwarf") gain += 1;
+  gain = Math.max(1, gain);
+  S.level = 2; S.maxHp += gain; S.hp = S.maxHp; S.hitDice = 2; S.slots = S.maxSlots;
+  const feats = {
+    fighter: ["<b>Action Surge:</b> once per rest, take one extra action on your turn. Two attacks in one turn!", "<b>Tactical Mind</b> (2024): spend Second Wind to boost a failed ability check."],
+    rogue: ["<b>Cunning Action:</b> Dash, Disengage, or Hide as a bonus action. Rogues become slippery."],
+    wizard: ["<b>A third spell slot</b> and two new spells for your spellbook.", "<b>Scholar</b> (2024): expertise in one knowledge skill."],
+    cleric: ["<b>Channel Divinity:</b> call on your god for a burst of power, like turning undead.", "<b>A third spell slot.</b>"]
+  }[S.cls];
+  if (S.cls === "wizard" || S.cls === "cleric") { S.maxSlots = 3; S.slots = 3; }
+  S.feats = feats;
+  hud();
+  sys(`<b>Level 2!</b> Max HP +${gain} (now ${S.maxHp}). Hit Dice: 2.`, "good");
+  add(`<ul class="sh-feat">${feats.map(f => `<li>${f}</li>`).join("")}</ul>`, "widget");
+  await tip("Proficiency bonus", `Your proficiency bonus stays +2 until level 5. Then it becomes +3, and your class gets something big (like a second attack, or the Fireball spell).`);
+  learn("etiquette", "conditions");
+  if (S.quiz.right === S.quiz.total) badge("scholar");
+  save();
+  await cont("See your report card");
+  await finale();
+}
+async function finale() {
+  scene("You're ready", "Your First Real Session");
+  await tip("Congratulations!", `<p>You've done almost everything a new player does at a real table. Here's a cheat sheet to bring with you.</p>`);
+  add(`<div class="cheat">
+    <div><h4>The one formula</h4><ul><li><b>d20 + modifier (+ proficiency)</b> vs a target</li><li>Checks and saves vs <b>DC</b>; attacks vs <b>AC</b></li><li>Meet or beat it to succeed</li></ul></div>
+    <div><h4>Your turn</h4><ul><li><b>Move</b> up to your speed</li><li><b>One action</b>: Attack, Cast, Dash, Dodge, Help, Hide...</li><li><b>Bonus action</b> only if something grants one</li><li><b>One reaction</b> per round</li></ul></div>
+    <div><h4>What to bring</h4><ul><li>A set of dice (or a dice app)</li><li>Pencil and eraser</li><li>Your character sheet</li><li>Snacks to share. This rule is not in the book but it is real.</li></ul></div>
+    <div><h4>Phrases that help</h4><ul><li>"Can I make a Perception check?"</li><li>"What do I see?"</li><li>"I'd like to try something..."</li><li>"How does that rule work again?"</li></ul></div>
+    <div><h4>Good table habits</h4><ul><li>Plan your turn while others take theirs</li><li>Share the spotlight</li><li>Say yes to other players' ideas</li><li>Ask about a <b>Session Zero</b></li></ul></div>
+    <div><h4>Don't worry about</h4><ul><li>Memorizing every rule</li><li>Optimizing your character</li><li>Doing it "right". Asking the DM is always right.</li></ul></div>
+  </div>`, "widget");
+  const b = Object.entries(BADGES).map(([k, [n, d]]) => `<div class="badge ${S.badges.includes(k) ? "" : "locked"}"><b>${S.badges.includes(k) ? n : "Locked"}</b>${S.badges.includes(k) ? d : "Play again to find it."}</div>`).join("");
+  add(`<div class="lbl" style="margin-bottom:8px">Achievements · ${S.badges.length}/${Object.keys(BADGES).length}</div><div class="badges">${b}</div>`, "widget");
+  sys(`Rulebook pages discovered: <b>${S.lore.length}/${CODEX.length}</b> · Quiz score: <b>${S.quiz.right}/${S.quiz.total}</b> · Gold: <b>${S.gold}</b> · Level <b>${S.level}</b>`);
+  await tip("Next steps", `<p>The free <b>Basic Rules</b> on D&D Beyond cover everything here and more. Starter sets are a great first adventure for a new group. And now you're ready to sit down at a table.</p><p>Good luck, ${esc(S.name)}. May your d20s roll high.</p>`);
+  while (true) {
+    const v = await choose([
+      { label: "Open the Rulebook", value: "codex" },
+      { label: "Play again with a new character", value: "again", cls: "primary" }
+    ]);
+    if (v === "codex") { renderCodex(); openDrawer("#codexDrawer"); }
+    else { const keep = { lore: S.lore, badges: S.badges }; S = freshState(); S.lore = keep.lore; S.badges = keep.badges; S.flags = {}; S.chapter = 1; save(); hud(); return run(1); }
+  }
+}
+
+/* =========================================================
+   Title & run loop
+   ========================================================= */
+const CHAPTERS = [null, chTable, chCreate, chTavern, chWoods, chAmbush, chCave, chBoss, chEnd];
+async function run(from) {
+  for (let i = from; i < CHAPTERS.length; i++) {
+    S.chapter = i; save(); hud();
+    await CHAPTERS[i]();
+  }
+}
+async function title() {
+  $("#chapterTag").textContent = ""; $("#sceneTitle").textContent = "";
+  logEl.innerHTML = ""; boardEl.innerHTML = "";
+  const saved = loadSave();
+  add(`<div class="title-screen">${TWENTY}<h1 class="big-title">Dicebound</h1><p class="tagline">A playable crash course in Dungeons &amp; Dragons. Learn the real 5th Edition rules by living them.</p>
+    <div class="feature-list"><div><b>Build a hero</b>Species, class, background, ability scores.</div><div><b>Roll real dice</b>Checks, saves, advantage, crits.</div><div><b>Fight goblins</b>Initiative, actions, reactions, death saves.</div><div><b>Talk, sneak, solve</b>Because not everything is a fight.</div></div>
+    <p class="hint" style="margin:0">About 30–45 minutes · Your progress saves at each chapter · Keys 1–9 pick choices</p></div>`, "plain");
+  $("#sceneHead").hidden = true;
+  const opts = [];
+  if (saved && saved.chapter > 1 && saved.cls) opts.push({ label: `Continue: ${saved.chapter > TOTAL_CH ? "Epilogue" : "Chapter " + saved.chapter}`, sub: saved.name ? `${esc(saved.name)}, level ${saved.level} ${CLASSES[saved.cls].name}` : "", value: "continue", cls: "primary big" });
+  opts.push({ label: saved && saved.chapter > 1 ? "Start a new adventure" : "Begin your adventure", value: "new", cls: saved && saved.chapter > 1 ? "big" : "primary big" });
+  const v = await choose(opts);
+  $("#sceneHead").hidden = false;
+  if (v === "continue") { S = Object.assign(freshState(), saved); hud(); await run(saved.chapter); }
+  else { S = freshState(); clearSave(); hud(); await run(1); }
+}
+hud();
+try { new ResizeObserver(() => document.documentElement.style.setProperty("--hud-h", $("#hud").offsetHeight + "px")).observe($("#hud")); } catch (e) {}
+title();
+</script>
+</body>
+</html>
