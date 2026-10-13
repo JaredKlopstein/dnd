@@ -1825,7 +1825,8 @@ async function title() {
   const saved = loadSave();
   add(`<div class="title-screen">${TWENTY}<h1 class="big-title">Dicebound</h1><p class="tagline">A playable crash course in Dungeons &amp; Dragons. Learn the real 5th Edition rules by living them.</p>
     <div class="feature-list"><div><b>Build a hero</b>Species, class, background, ability scores.</div><div><b>Roll real dice</b>Checks, saves, advantage, crits.</div><div><b>Fight goblins</b>Initiative, actions, reactions, death saves.</div><div><b>Talk, sneak, solve</b>Because not everything is a fight.</div></div>
-    <p class="hint" style="margin:0">About 30–45 minutes · Your progress saves at each chapter · Keys 1–9 pick choices</p></div>`, "plain");
+    <p class="hint" style="margin:0">About 30–45 minutes · Your progress saves at each chapter · Keys 1–9 pick choices</p>
+    <p class="hint" style="margin:12px 0 0;font-size:12px;opacity:.7">Unofficial fan-made tutorial, not affiliated with or endorsed by Wizards of the Coast. Includes rules material from the System Reference Document 5.1 by Wizards of the Coast LLC, licensed under <a href="https://creativecommons.org/licenses/by/4.0/legalcode" target="_blank" rel="noopener">CC BY 4.0</a>.</p></div>`, "plain");
   $("#sceneHead").hidden = true;
   const opts = [];
   if (saved && saved.chapter > 1 && saved.cls) opts.push({ label: `Continue: ${saved.chapter > TOTAL_CH ? "Epilogue" : "Chapter " + saved.chapter}`, sub: saved.name ? `${esc(saved.name)}, level ${saved.level} ${CLASSES[saved.cls].name}` : "", value: "continue", cls: "primary big" });
